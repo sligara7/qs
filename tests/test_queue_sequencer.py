@@ -141,7 +141,11 @@ def test_items_do_not_run_until_queue_started_then_run_in_order(stack) -> None:
     assert all(h.state is ItemState.COMPLETED and h.exit_status == "success" for h in hist)
     assert all(len(h.run_uids) == 1 and h.time_stop >= h.time_start for h in hist)
     assert len(queue) == 0
-    assert seq.queue_running, "an empty started queue stays started, as in queueserver"
+    wait_for(lambda: not seq.queue_running)
+    # queueserver semantics: the queue goes idle when it runs empty, and starting an empty
+    # queue is refused with queueserver's message.
+    with pytest.raises(SequencerError, match="Queue is empty"):
+        seq.queue_start()
 
 
 def test_failure_stops_the_queue_and_waits_for_a_human(stack) -> None:

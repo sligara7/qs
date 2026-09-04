@@ -112,6 +112,8 @@ class Sequencer:
         with self._lock:
             if self._host.state is EngineState.NO_ENGINE:
                 raise SequencerError("No profile loaded; the queue cannot start")
+            if len(self._queue) == 0:
+                raise SequencerError("Queue is empty.")  # queueserver's wording
             self._running = True
             self._stop_pending = False
         self._events.emit("queue_state", running=True, stop_pending=False, autostart=self._autostart)
@@ -157,8 +159,18 @@ class Sequencer:
                 continue
             item = self._queue.pop_front()
             if item is None:
-                self._wakeup.wait(self._poll_interval)
-                self._wakeup.clear()
+                # queueserver semantics: a started queue that runs empty goes idle; autostart
+                # (if enabled) starts it again when the next item arrives.
+                with self._lock:
+                    self._running = False
+                    self._stop_pending = False
+                self._events.emit(
+                    "queue_state",
+                    running=False,
+                    stop_pending=False,
+                    autostart=self._autostart,
+                    reason="queue empty",
+                )
                 continue
             self._run_one(item)
 
