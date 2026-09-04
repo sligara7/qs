@@ -74,10 +74,16 @@ def _callback_name(cb: Any) -> str:
     inst = getattr(cb, "inst", None)
     func = getattr(cb, "func", None)
     if inst is not None or func is not None:
-        target = inst() if callable(inst) else inst
+        # bluesky's _BoundMethodProxy: a bound method (inst + func) or a plain callable (func
+        # only). A callable instance such as a TiledWriter has no __name__, so use its class.
+        target = inst() if callable(inst) and not isinstance(inst, type) else inst
         owner = type(target).__name__ if target is not None else ""
         fname = getattr(func, "__name__", "")
-        return f"{owner}.{fname}".strip(".") if owner else fname or type(cb).__name__
+        if owner:
+            return f"{owner}.{fname}".strip(".")
+        if fname:
+            return fname
+        return type(func).__name__ if func is not None else type(cb).__name__
     if hasattr(cb, "__self__"):
         return f"{type(cb.__self__).__name__}.{cb.__name__}"
     name = getattr(cb, "__name__", None)
