@@ -1,0 +1,290 @@
+{
+ "source": "finch origin/feat/qserver-client src/api/qServer/openapi.json @ f9e9293 (2026-08-27), title Bluesky HTTP Server",
+ "operations": [
+  {
+   "method": "DELETE",
+   "path": "/api/auth/apikey"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/auth/session/revoke/{session_id}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/apikey"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/principal"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/principal/{uuid}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/scopes"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/whoami"
+  },
+  {
+   "method": "GET",
+   "path": "/api/config/get"
+  },
+  {
+   "method": "GET",
+   "path": "/api/console_output"
+  },
+  {
+   "method": "GET",
+   "path": "/api/console_output/uid"
+  },
+  {
+   "method": "GET",
+   "path": "/api/console_output_update"
+  },
+  {
+   "method": "GET",
+   "path": "/api/devices/allowed"
+  },
+  {
+   "method": "GET",
+   "path": "/api/devices/existing"
+  },
+  {
+   "method": "GET",
+   "path": "/api/history/get"
+  },
+  {
+   "method": "GET",
+   "path": "/api/lock/info"
+  },
+  {
+   "method": "GET",
+   "path": "/api/permissions/get"
+  },
+  {
+   "method": "GET",
+   "path": "/api/ping"
+  },
+  {
+   "method": "GET",
+   "path": "/api/plans/allowed"
+  },
+  {
+   "method": "GET",
+   "path": "/api/plans/existing"
+  },
+  {
+   "method": "GET",
+   "path": "/api/queue/get"
+  },
+  {
+   "method": "GET",
+   "path": "/api/queue/item/get"
+  },
+  {
+   "method": "GET",
+   "path": "/api/re/metadata"
+  },
+  {
+   "method": "GET",
+   "path": "/api/re/runs/active"
+  },
+  {
+   "method": "GET",
+   "path": "/api/re/runs/closed"
+  },
+  {
+   "method": "GET",
+   "path": "/api/re/runs/open"
+  },
+  {
+   "method": "GET",
+   "path": "/api/status"
+  },
+  {
+   "method": "GET",
+   "path": "/api/stream_console_output"
+  },
+  {
+   "method": "GET",
+   "path": "/api/task/result"
+  },
+  {
+   "method": "GET",
+   "path": "/api/task/status"
+  },
+  {
+   "method": "GET",
+   "path": "/api/test/server/sleep"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/apikey"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/logout"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/principal/{uuid}/apikey"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/session/refresh"
+  },
+  {
+   "method": "POST",
+   "path": "/api/environment/close"
+  },
+  {
+   "method": "POST",
+   "path": "/api/environment/destroy"
+  },
+  {
+   "method": "POST",
+   "path": "/api/environment/open"
+  },
+  {
+   "method": "POST",
+   "path": "/api/environment/update"
+  },
+  {
+   "method": "POST",
+   "path": "/api/function/execute"
+  },
+  {
+   "method": "POST",
+   "path": "/api/history/clear"
+  },
+  {
+   "method": "POST",
+   "path": "/api/kernel/interrupt"
+  },
+  {
+   "method": "POST",
+   "path": "/api/lock"
+  },
+  {
+   "method": "POST",
+   "path": "/api/manager/stop"
+  },
+  {
+   "method": "POST",
+   "path": "/api/permissions/reload"
+  },
+  {
+   "method": "POST",
+   "path": "/api/permissions/set"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/autostart"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/clear"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/item/add"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/item/add/batch"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/item/execute"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/item/move"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/item/move/batch"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/item/remove"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/item/remove/batch"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/item/update"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/mode/set"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/start"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/stop"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/stop/cancel"
+  },
+  {
+   "method": "POST",
+   "path": "/api/queue/upload/spreadsheet"
+  },
+  {
+   "method": "POST",
+   "path": "/api/re/abort"
+  },
+  {
+   "method": "POST",
+   "path": "/api/re/halt"
+  },
+  {
+   "method": "POST",
+   "path": "/api/re/pause"
+  },
+  {
+   "method": "POST",
+   "path": "/api/re/resume"
+  },
+  {
+   "method": "POST",
+   "path": "/api/re/runs"
+  },
+  {
+   "method": "POST",
+   "path": "/api/re/stop"
+  },
+  {
+   "method": "POST",
+   "path": "/api/script/upload"
+  },
+  {
+   "method": "POST",
+   "path": "/api/test/manager/kill"
+  },
+  {
+   "method": "POST",
+   "path": "/api/unlock"
+  }
+ ],
+ "websockets": [
+  "/api/status/ws",
+  "/api/info/ws",
+  "/api/console_output/ws"
+ ]
+}

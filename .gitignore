@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.sqlite
+*.db
+.reflow2/graph/
+.reflow2/*.log
+.reflow2/graph.server.json
+.reflow2/graph.client.json
+.reflow2/loop-nudge
