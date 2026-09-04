@@ -102,6 +102,10 @@ def test_status_document_has_finch_fields(client: TestClient) -> None:
     assert s["manager_state"] == "idle" and s["re_state"] == "idle" and s["worker_environment_exists"] is True
     assert s["plan_queue_mode"] == {"loop": False, "ignore_failures": False}
     assert s["lock"] == {"environment": False, "queue": False}
+    # The profile's own subscribers are visible, and the service added none (dec:no-service-document-consumers).
+    subs = s["qs"]["engine_subscribers"]
+    assert "start" in subs and subs["start"], subs
+    assert all(not n.startswith("qs.") for names in subs.values() for n in names)
 
 
 def test_plans_and_devices_allowed(client: TestClient) -> None:

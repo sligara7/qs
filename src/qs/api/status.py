@@ -94,6 +94,7 @@ class StatusReporter:
                 "engine_state": host.state.value,
                 "engine_adopted": host.engine_adopted,
                 "last_error": host.last_error or seq.last_error,
+                "engine_subscribers": host.subscribers(),
             },
         }
 

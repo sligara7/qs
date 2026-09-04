@@ -69,6 +69,23 @@ class PlanOutcome:
         return self.exit_status == "success"
 
 
+def _callback_name(cb: Any) -> str:
+    """Human-readable name for a subscribed callback, unwrapping bluesky's bound-method proxy."""
+    inst = getattr(cb, "inst", None)
+    func = getattr(cb, "func", None)
+    if inst is not None or func is not None:
+        target = inst() if callable(inst) else inst
+        owner = type(target).__name__ if target is not None else ""
+        fname = getattr(func, "__name__", "")
+        return f"{owner}.{fname}".strip(".") if owner else fname or type(cb).__name__
+    if hasattr(cb, "__self__"):
+        return f"{type(cb.__self__).__name__}.{cb.__name__}"
+    name = getattr(cb, "__name__", None)
+    if name and name != "<lambda>":
+        return name
+    return type(cb).__name__ if name is None else f"{type(cb).__name__}:<lambda>"
+
+
 class EngineHostError(RuntimeError):
     """Raised for host-level misuse (no engine, wrong state, host closed)."""
 
@@ -164,6 +181,27 @@ class EngineHost:
     @property
     def last_error(self) -> str | None:
         return self._last_error
+
+    def subscribers(self) -> dict[str, list[str]]:
+        """Names of the callbacks subscribed to the engine, per document type (read-only).
+
+        The service never adds or removes subscribers (``dec:no-service-document-consumers``);
+        this exists so an operator can confirm the profile's Tiled writer or BestEffortCallback
+        is attached.
+        """
+        engine = self._engine
+        if engine is None:
+            return {}
+        try:
+            registry = engine.dispatcher.cb_registry.callbacks
+        except AttributeError:  # pragma: no cover - bluesky internals moved
+            return {}
+        out: dict[str, list[str]] = {}
+        for doc_type, callbacks in registry.items():
+            names = sorted({_callback_name(cb) for cb in callbacks.values()})
+            if names:
+                out[getattr(doc_type, "value", str(doc_type))] = names
+        return out
 
     @property
     def re_state(self) -> str | None:
