@@ -1,0 +1,13 @@
+# qs against the HEX profile-collection on the simulated HEX beamline (development only).
+startup:
+  kind: ipython
+  startup_dir: /home/asligar/git_projects/hex-profile-collection/startup
+database:
+  url: sqlite:///<scratch>/qs-hex.sqlite
+http:
+  host: 127.0.0.1
+  port: 60610
+  allow_origins: ["http://localhost:5173", "http://127.0.0.1:5173"]
+engine:
+  stream_device_progress: true
+  capture_console: true
