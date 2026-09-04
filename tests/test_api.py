@@ -195,6 +195,8 @@ def test_pause_resume_abort_over_http(client: TestClient) -> None:
     assert status(client)["re_state"] == "paused"
     runs = client.post("/api/re/runs", json={"option": "active"}).json()
     assert runs["success"] and len(runs["run_list"]) == 1 and runs["run_list"][0]["is_open"]
+    run_uid = runs["run_list"][0]["uid"]
+    assert isinstance(run_uid, str) and len(run_uid) >= 32, "active run must report its start uid"
     assert client.post("/api/re/resume").json()["success"]
     wait_for(lambda: status(client)["re_state"] == "running")
     assert client.post("/api/re/abort", json={"reason": "test"}).json()["success"]

@@ -77,31 +77,29 @@ async def re_metadata(services: Services = Depends(get_services)) -> dict[str, A
     )
 
 
-def _run_list(services: Services, option: str) -> list[dict[str, Any]]:
-    outcome = services.host.last_outcome
-    running = services.host.state in (EngineState.RUNNING, EngineState.PAUSED)
-    if option == "active":
-        if not running:
-            return []
-        uids = _open_run_uids(services)
-        return [{"uid": u, "is_open": True, "scan_id": None} for u in uids]
-    if option == "open":
-        return (
-            [{"uid": u, "is_open": True, "scan_id": None} for u in _open_run_uids(services)]
-            if running
-            else []
-        )
-    if outcome is None:
-        return []
-    return [{"uid": u, "is_open": False, "scan_id": None} for u in outcome.run_uids]
-
-
-def _open_run_uids(services: Services) -> list[str]:
+def _open_runs(services: Services) -> list[dict[str, Any]]:
+    """Open runs from the engine's run bundlers: start uid and scan_id when known."""
     engine = services.host.engine
     if engine is None:
         return []
     bundlers = getattr(engine, "_run_bundlers", {})  # noqa: SLF001
-    return [str(k) for k in bundlers]
+    out: list[dict[str, Any]] = []
+    for bundler in bundlers.values():
+        uid = getattr(bundler, "_run_start_uid", None)  # noqa: SLF001
+        md = getattr(bundler, "_md", None) or getattr(bundler, "md", None) or {}  # noqa: SLF001
+        scan_id = md.get("scan_id") if isinstance(md, dict) else None
+        out.append({"uid": uid, "is_open": True, "scan_id": scan_id})
+    return out
+
+
+def _run_list(services: Services, option: str) -> list[dict[str, Any]]:
+    running = services.host.state in (EngineState.RUNNING, EngineState.PAUSED)
+    if option in ("active", "open"):
+        return _open_runs(services) if running else []
+    outcome = services.host.last_outcome
+    if outcome is None:
+        return []
+    return [{"uid": u, "is_open": False, "scan_id": None} for u in outcome.run_uids]
 
 
 @router.post("/re/runs", dependencies=[Depends(require_scope("read:status"))])
