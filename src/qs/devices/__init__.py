@@ -1,4 +1,4 @@
-"""Device Definitions (``cmp:device-definitions``): CRUD on stored definitions and their live instantiation."""
+"""Device Definitions (``cmp:device-definitions``): stored definitions and their live instances."""
 
 from qs.devices.models import DeviceDefinition
 from qs.devices.repository import DeviceDefinitionRepository

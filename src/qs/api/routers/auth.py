@@ -50,7 +50,8 @@ async def scopes(principal: Principal = Depends(get_principal)) -> dict[str, Any
 @router.post("/auth/apikey")
 async def apikey_create(principal: Principal = Depends(get_principal)) -> dict[str, Any]:
     return fail(
-        "Creating API keys is not supported under the single-user key; set QSERVER_HTTP_SERVER_SINGLE_USER_API_KEY"
+        "Creating API keys is not supported under the single-user key; "
+        "set QSERVER_HTTP_SERVER_SINGLE_USER_API_KEY"
     )
 
 
