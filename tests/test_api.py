@@ -139,6 +139,9 @@ def test_queue_add_get_move_remove(client: TestClient) -> None:
     q = client.get("/api/queue/get").json()
     assert [i["item_uid"] for i in q["items"]] == [b, a] and q["running_item"] == {}
     assert client.request("GET", "/api/queue/item/get", json={"uid": a}).json()["item"]["item_uid"] == a
+    # finch main fetches single items by path (not in httpserver's spec); honoured as an alias.
+    assert client.get(f"/api/queue/item/{a}").json()["item"]["item_uid"] == a
+    assert client.get("/api/queue/item/no-such-uid").json()["success"] is False
     r = client.post("/api/queue/item/move", json={"uid": b, "pos_dest": "back"}).json()
     assert r["success"] and [i["item_uid"] for i in client.get("/api/queue/get").json()["items"]] == [a, b]
     r = client.post(

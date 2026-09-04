@@ -201,8 +201,12 @@ class Sequencer:
                 exception=f"{type(exc).__name__}: {exc}",
                 traceback=traceback.format_exc(),
             )
-        finally:
+        except BaseException:
             self._running_item = None
+            raise
+        # Keep the item reported as running until its history row and the queue state are
+        # written, so a client polling status never sees "idle, nothing running" before the
+        # outcome is visible.
         self._record(item, outcome, time_start)
         if outcome.succeeded:
             if self._loop_mode:
@@ -220,6 +224,7 @@ class Sequencer:
                 autostart=self._autostart,
                 reason=self._last_error,
             )
+        self._running_item = None
 
     def _record(self, item: QueueItem, outcome: PlanOutcome, time_start: float) -> None:
         entry = HistoryEntry(

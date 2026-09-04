@@ -60,6 +60,16 @@ async def item_get(request: Request, services: Services = Depends(get_services))
         return fail(str(exc), item={})
 
 
+@router.get("/queue/item/{item_uid}", dependencies=[Depends(require_scope("read:queue"))])
+async def item_get_by_path(item_uid: str, services: Services = Depends(get_services)) -> dict[str, Any]:
+    """Path-style alias used by finch's hand-rolled client (``GET /queue/item/<uid>``); not in
+    bluesky-httpserver's spec but cheap to honour (``req:finch-client-compat``)."""
+    try:
+        return ok("", item=services.queue.get(item_uid).to_dict())
+    except QueueError as exc:
+        return fail(str(exc), item={})
+
+
 @router.post("/queue/item/add", dependencies=[Depends(require_scope("write:queue"))])
 async def item_add(
     request: Request,
