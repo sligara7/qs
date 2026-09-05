@@ -1,0 +1,11 @@
+startup:
+  kind: ipython
+  startup_dir: <qs>/tools/hextools-sim-profile/startup
+database:
+  url: sqlite:///<scratch>/qs-hextools.sqlite
+http:
+  host: 127.0.0.1
+  port: 60610
+engine:
+  stream_device_progress: true
+  capture_console: true
