@@ -277,3 +277,64 @@ def test_require_synced_experiment_guards_start_and_autostart(tmp_path: Path) ->
         seq.close()
     finally:
         host.shutdown()
+
+
+class _FlakyRepository(InMemoryQueueRepository):
+    """An in-memory repository whose history writes can be made to fail like a lost database."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.down = False
+
+    def append_history(self, entry) -> None:  # noqa: ANN001
+        if self.down:
+            raise ConnectionError("database unreachable")
+        super().append_history(entry)
+
+    def list_history(self):  # noqa: ANN201
+        if self.down:
+            raise ConnectionError("database unreachable")
+        return super().list_history()
+
+
+def test_database_unreachable_after_plan_holds_history_and_stops_queue(tmp_path: Path) -> None:
+    # Decided 2026-09-04: the running plan is never touched; its outcome is held in memory,
+    # the queue stops with the error in status, and the entry is written when the database returns.
+    from qs.api.status import StatusReporter
+
+    events = EventBus()
+    host = EngineHost(events=events)
+    host.start()
+    try:
+        load = host.load_source(IPythonProfileSource(PROFILE))
+        registry = Registry()
+        registry.load_from(load)
+        repo = _FlakyRepository()
+        queue = QueueService(repo, registry)
+        seq = Sequencer(host=host, queue=queue, registry=registry, events=events, poll_interval=0.05)
+        status = StatusReporter(host=host, queue=queue, sequencer=seq, registry=registry)
+        seq.start_thread()
+        queue.add(QueueItem(name="count", args=[["det"]], kwargs={"num": 1}))
+        assert status.snapshot()["qs"]["database_ok"] is True
+
+        repo.down = True  # the database vanishes while the plan runs
+        seq.queue_start()
+        wait_for(lambda: len(seq.pending_history) == 1)
+        wait_for(lambda: not seq.queue_running)
+        assert seq.pending_history[0].exit_status == "success"
+        assert "Database unavailable" in (seq.last_error or "")
+        snap = status.snapshot()  # status keeps answering
+        assert snap["qs"]["database_ok"] is False and snap["qs"]["pending_history"] == 1
+        assert snap["items_in_history"] == 1 and snap["manager_state"] == "idle"
+        queue.add(QueueItem(name="count", args=[["det"]], kwargs={"num": 1}))
+        with pytest.raises(SequencerError, match="Database unavailable"):
+            seq.queue_start()
+
+        repo.down = False  # the database is back: the held outcome is written, the queue runs again
+        seq.queue_start()
+        wait_for(lambda: len(queue.history()) == 2)
+        assert seq.pending_history == () and seq.database_error is None
+        assert status.snapshot()["qs"]["database_ok"] is True
+        seq.close()
+    finally:
+        host.shutdown()

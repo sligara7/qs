@@ -56,6 +56,8 @@ class Sequencer:
         self._events = events
         self._poll_interval = poll_interval
         self._require_synced_experiment = require_synced_experiment
+        self._pending_history: list[HistoryEntry] = []
+        self._database_error: str | None = None
 
         self._lock = threading.Lock()
         self._wakeup = threading.Event()
@@ -123,8 +125,36 @@ class Sequencer:
                 "No experiment synced: RE.md has no 'data_session'. Run sync-experiment first."
             )
 
+    @property
+    def pending_history(self) -> tuple[HistoryEntry, ...]:
+        """History entries not yet written because the database was unreachable."""
+        return tuple(self._pending_history)
+
+    @property
+    def database_error(self) -> str | None:
+        return self._database_error
+
+    def flush_pending_history(self) -> bool:
+        """Write held history entries; True when nothing is left pending."""
+        while self._pending_history:
+            try:
+                self._queue.record_history(self._pending_history[0])
+            except Exception as exc:  # noqa: BLE001 - the database is still unreachable
+                self._database_error = f"{type(exc).__name__}: {exc}"
+                return False
+            self._pending_history.pop(0)
+        self._database_error = None
+        return True
+
     def queue_start(self) -> None:
         self._check_experiment()
+        if not self.flush_pending_history():
+            pending = len(self._pending_history)
+            raise SequencerError(
+                f"Database unavailable ({self._database_error}); {pending} history "
+                f"{'entry is' if pending == 1 else 'entries are'} held in memory. "
+                "Fix the database, then start the queue again."
+            )
         with self._lock:
             if self._host.state is EngineState.NO_ENGINE:
                 raise SequencerError("No profile loaded; the queue cannot start")
@@ -267,7 +297,27 @@ class Sequencer:
             msg=outcome.exception or outcome.reason,
             traceback=outcome.traceback,
         )
-        self._safe(lambda: self._queue.record_history(entry))
+        self.flush_pending_history()
+        try:
+            self._queue.record_history(entry)
+            self._database_error = None
+        except Exception as exc:  # noqa: BLE001 - the plan is done; only bookkeeping failed
+            # The outcome is not lost: it is held here and written when the database returns
+            # (flush on the next queue_start). The queue stops so nothing runs unrecorded.
+            self._pending_history.append(entry)
+            self._database_error = f"{type(exc).__name__}: {exc}"
+            logger.error(
+                "History for %s (%s) could not be written; holding it in memory: %s",
+                item.name,
+                item.item_uid,
+                self._database_error,
+            )
+            with self._lock:
+                self._running = False
+            self._last_error = (
+                f"Database unavailable: {self._database_error}. Outcome of {item.name} "
+                f"({outcome.exit_status}) is held in memory; the queue stopped."
+            )
         self._events.emit(
             "item_finished", item_uid=item.item_uid, name=item.name, exit_status=outcome.exit_status
         )

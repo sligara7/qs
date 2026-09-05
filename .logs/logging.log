@@ -1,0 +1,27 @@
+|2026-09-04 20:55:52.433|INFO|4031618|root|logging_setup|229|MainThread| - **************************************** Bluesky Startup
+|2026-09-04 20:55:52.433|BSDEV|4031618|root|logging_setup|89|MainThread| - /home/asligar/git_projects/qs/.venv/lib/python3.12/site-packages/apsbits/utils/logging_setup.py
+|2026-09-04 20:55:52.433|BSDEV|4031618|root|logging_setup|89|MainThread| - Log file: /home/asligar/git_projects/qs/.logs/logging.log
+|2026-09-04 20:55:52.434|INFO|4031618|apsbits.demo_instrument.startup|startup|53|MainThread| - Starting Instrument with iconfig: /home/asligar/git_projects/qs/.venv/lib/python3.12/site-packages/apsbits/demo_instrument/configs/iconfig.yml
+|2026-09-04 20:55:52.434|ERROR|4031618|apsbits.core.catalog_init|catalog_init|60|MainThread| - _databroker_named_catalog() Failed to create catalog: 'temp'
+|2026-09-04 20:55:52.498|INFO|4031618|apsbits.core.catalog_init|catalog_init|89|MainThread| - Databroker temporary catalog initialized
+|2026-09-04 20:55:52.498|INFO|4031618|apsbits.utils.controls_setup|controls_setup|123|MainThread| - using ophyd control layer: 'pyepics'
+|2026-09-04 20:55:52.499|INFO|4031618|apsbits.utils.metadata|metadata|99|MainThread| - RunEngine metadata saved to: .re_md_dict.yml
+|2026-09-04 20:55:53.184|INFO|4031618|apsbits.demo_instrument.callbacks.demo_spec_callback|demo_spec_callback|94|MainThread| - SPEC data file: /home/asligar/git_projects/qs/20260904-205553.dat
+|2026-09-04 20:55:53.450|INFO|4031618|apsbits.core.instrument_init|instrument_init|78|MainThread| - No custom path provided.
+
+Using default configs path: /home/asligar/git_projects/qs/.venv/lib/python3.12/site-packages/apsbits/demo_instrument/configs
+|2026-09-04 20:55:53.450|INFO|4031618|apsbits.core.instrument_init|instrument_init|107|MainThread| - Loading device file: /home/asligar/git_projects/qs/.venv/lib/python3.12/site-packages/apsbits/demo_instrument/configs/devices.yml
+|2026-09-04 20:55:53.502|INFO|4031618|apsbits.core.instrument_init|instrument_init|159|MainThread| - Devices loaded in 0.052 s.
+|2026-09-04 20:55:53.503|INFO|4031618|apsbits.core.instrument_init|instrument_init|165|MainThread| - Adding ophyd device 'sim_det' to main namespace
+|2026-09-04 20:55:53.504|INFO|4031618|apsbits.core.instrument_init|instrument_init|165|MainThread| - Adding ophyd device 'sim_motor' to main namespace
+|2026-09-04 20:55:54.504|INFO|4031618|apsbits.utils.baseline_setup|baseline_setup|97|MainThread| - Adding marked objects to 'baseline' stream.
+|2026-09-04 20:55:54.506|INFO|4031618|qs.sources.bits_instrument|bits_instrument|50|MainThread| - Loaded BITS instrument apsbits.demo_instrument.startup: 13 devices, 24 plans, engine adopted
+|2026-09-04 20:55:54.518|INFO|4031618|happi.client|client|306|MainThread| - Storing item OphydItem (name=motor) ...
+|2026-09-04 20:55:54.518|INFO|4031618|happi.client|client|808|MainThread| - Adding / Modifying information for motor ...
+|2026-09-04 20:55:54.519|INFO|4031618|happi.client|client|308|MainThread| - HappiItem OphydItem (name=motor) has been succesfully added to the database
+|2026-09-04 20:55:54.527|INFO|4031618|happi.client|client|306|MainThread| - Storing item OphydItem (name=det) ...
+|2026-09-04 20:55:54.527|INFO|4031618|happi.client|client|808|MainThread| - Adding / Modifying information for det ...
+|2026-09-04 20:55:54.528|INFO|4031618|happi.client|client|308|MainThread| - HappiItem OphydItem (name=det) has been succesfully added to the database
+|2026-09-04 20:55:54.530|ERROR|4031618|qs.sources.happi_database|happi_database|60|MainThread| - happi device det could not be loaded: TypeError: SynGauss.__init__() got multiple values for argument 'name'
+|2026-09-04 20:55:54.530|ERROR|4031618|qs.sources.happi_database|happi_database|60|MainThread| - happi device motor could not be loaded: TypeError: SynAxis.__init__() takes 1 positional argument but 2 positional arguments (and 1 keyword-only argument) were given
+|2026-09-04 20:55:54.530|INFO|4031618|qs.sources.happi_database|happi_database|63|MainThread| - Loaded 0 devices from /tmp/tmp4mbgh56f/db.json (2 failed)

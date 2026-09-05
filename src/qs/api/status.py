@@ -33,6 +33,8 @@ class StatusReporter:
         self._registry = registry
         self._registry_uid = _uid_of("registry", 0)
         self._registry_revision = 0
+        self._last_counts = (0, 0)  # (items_in_queue, items_in_history) when the database last answered
+        self._database_error: str | None = None
 
     def bump_registry(self) -> None:
         self._registry_revision += 1
@@ -61,12 +63,19 @@ class StatusReporter:
         seq = self._sequencer
         env_exists = host.state not in (EngineState.STARTING, EngineState.NO_ENGINE, EngineState.CLOSED)
         running_item = seq.running_item
-        history = self._queue.history()
-        qsize = len(self._queue)
+        try:
+            qsize = len(self._queue)
+            history_len = len(self._queue.history())
+            self._last_counts = (qsize, history_len)
+            self._database_error = None
+        except Exception as exc:  # noqa: BLE001 - status must answer while the database is down
+            qsize, history_len = self._last_counts
+            self._database_error = f"{type(exc).__name__}: {exc}"
+        pending = seq.pending_history
         return {
             "msg": f"qs v{__version__} (bluesky-queueserver compatible)",
             "items_in_queue": qsize,
-            "items_in_history": len(history),
+            "items_in_history": history_len + len(pending),
             "running_item_uid": running_item.item_uid if running_item else None,
             "manager_state": self.manager_state(),
             "queue_stop_pending": seq.stop_pending,
@@ -80,7 +89,7 @@ class StatusReporter:
             "pause_pending": False,
             "run_list_uid": _uid_of("runs", host.last_outcome.run_uids if host.last_outcome else ()),
             "plan_queue_uid": _uid_of("queue", self._queue.revision),
-            "plan_history_uid": _uid_of("history", len(history)),
+            "plan_history_uid": _uid_of("history", history_len + len(pending)),
             "devices_existing_uid": self._registry_uid,
             "plans_existing_uid": self._registry_uid,
             "devices_allowed_uid": self._registry_uid,
@@ -96,6 +105,9 @@ class StatusReporter:
                 "last_error": host.last_error or seq.last_error,
                 "engine_subscribers": host.subscribers(),
                 "experiment": host.experiment_metadata(),
+                "database_ok": self._database_error is None and seq.database_error is None,
+                "database_error": self._database_error or seq.database_error,
+                "pending_history": len(pending),
                 "require_synced_experiment": seq.require_synced_experiment,
             },
         }

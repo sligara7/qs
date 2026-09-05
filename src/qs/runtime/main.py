@@ -33,6 +33,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--no-console-capture", action="store_true")
     parser.add_argument("--log-level", default="INFO")
+    parser.add_argument(
+        "--list-plans",
+        action="store_true",
+        help="load the profile, print its plans and devices, and exit without serving",
+    )
     parser.add_argument("--version", action="version", version=f"qs {__version__}")
     return parser.parse_args(argv)
 
@@ -59,6 +64,9 @@ def main(argv: list[str] | None = None) -> int:
     elif args.happi_path:
         overrides["startup.kind"] = "happi"
     config = load_config(config_path=args.config, overrides=overrides)
+
+    if args.list_plans:
+        return list_plans(config)
 
     import uvicorn
 
@@ -87,6 +95,41 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         application.close()
     return 0
+
+
+def list_plans(config: Any, out: Any = None) -> int:
+    """Load the profile the way the service would and print what it found (no server)."""
+    from qs.engine import EngineHost, EventBus
+    from qs.registry import Registry
+    from qs.runtime.compose import make_source
+
+    out = out or sys.stdout
+    host = EngineHost(events=EventBus())
+    host.start()
+    try:
+        result = host.load_source(make_source(config))
+        registry = Registry()
+        registry.load_from(result)
+        print(f"# {result.source_description}", file=out)
+        print(f"# engine: {'adopted from profile' if host.engine_adopted else 'created by qs'}", file=out)
+        print(f"\n{len(registry.devices())} devices", file=out)
+        for name, entry in sorted(registry.devices().items()):
+            print(f"  {name:28s} {type(entry.device).__name__}", file=out)
+        print(f"\n{len(registry.plans())} plans", file=out)
+        for name, factory in sorted(registry.plans().items()):
+            print(f"  {name:28s} {_signature(factory)}", file=out)
+    finally:
+        host.shutdown()
+    return 0
+
+
+def _signature(plan: Any) -> str:
+    import inspect
+
+    try:
+        return str(inspect.signature(plan))
+    except (TypeError, ValueError):
+        return "(...)"
 
 
 if __name__ == "__main__":

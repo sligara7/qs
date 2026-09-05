@@ -1,0 +1,56 @@
+# Written by StoredDict.
+# Dictionary contents written: 2026-09-04 21:07:44.008365
+
+beamline_id: demo_instrument
+conda_prefix: /home/asligar/miniconda3
+iconfig:
+  BASELINE_LABEL:
+    ENABLE: true
+  BEC:
+    BASELINE: true
+    HEADING: true
+    PLOTS: false
+    TABLE: true
+  DATABROKER_CATALOG: temp
+  DM_SETUP_FILE: /home/dm/etc/dm.setup.sh
+  ICONFIG_PATH: /home/asligar/git_projects/qs/.venv/lib/python3.12/site-packages/apsbits/demo_instrument/configs/iconfig.yml
+  ICONFIG_VERSION: 2.0.1
+  INSTRUMENT_FOLDER: configs
+  INSTRUMENT_PATH: /home/asligar/git_projects/qs/.venv/lib/python3.12/site-packages/apsbits/demo_instrument/configs
+  NEXUS_DATA_FILES:
+    ENABLE: false
+    FILE_EXTENSION: hdf
+  OPHYD:
+    CONTROL_LAYER: PyEpics
+    TIMEOUTS:
+      PV_CONNECTION: 5
+      PV_READ: 5
+      PV_WRITE: 5
+  RUN_ENGINE:
+    DEFAULT_METADATA:
+      beamline_id: demo_instrument
+      instrument_name: Most Glorious Scientific Instrument
+      proposal_id: commissioning
+    MD_PATH: .re_md_dict.yml
+    USE_PROGRESS_BAR: false
+  SPEC_DATA_FILES:
+    ENABLE: true
+    FILE_EXTENSION: dat
+  XMODE_DEBUG_LEVEL: Plain
+instrument_name: Most Glorious Scientific Instrument
+login_id: asligar@lps-172683.nsls2.bnl.gov
+pid: 4091432
+proposal_id: commissioning
+versions:
+  apsbits: 2.0.3
+  apstools: 1.7.11
+  bluesky: 1.15.1
+  databroker: 1.2.5
+  epics: 3.5.10
+  h5py: 3.16.0
+  matplotlib: 3.11.1
+  numpy: 2.5.2
+  ophyd: 1.11.2
+  pyRestTable: 2020.0.11
+  pysumreg: 1.0.7
+  python: 3.12.2

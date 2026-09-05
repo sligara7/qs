@@ -1,0 +1,35 @@
+# systemd unit for qs (dec: launch mechanism, 2026-09-04).
+# qs runs INSIDE the profile-collection's environment, because the profile's own packages
+# (ophyd-async, nslsii, hextools, redis-json-dict ...) must be importable by the service.
+# With a pixi-managed profile (hextools' pixi.toml already declares a `qs` feature) that is
+# `pixi run -e qs qs ...`; with a conda/venv profile, use that environment's `qs` entry point.
+#
+#   install: cp qs.service /etc/systemd/system/qs.service; systemctl daemon-reload
+#   secrets: /etc/qs/qs.env (mode 0600) holds the API key and beamline variables
+#   port:    QS_HTTP_PORT in /etc/qs/qs.env, or http.port in /etc/qs/qs.yml
+#   logs:    journalctl -fu qs.service
+
+[Unit]
+Description=qs Bluesky queue service (HEX)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xf27id1
+Group=xf27id1
+WorkingDirectory=/nsls2/software/hex/hex-profile-collection
+# BEAMLINE_ACRONYM / ENDSTATION_ACRONYM (nslsii path providers), Redis/Tiled/Kafka settings,
+# QSERVER_HTTP_SERVER_SINGLE_USER_API_KEY, QSERVER_CONFIG=/etc/qs/qs.yml, QS_HTTP_PORT ...
+EnvironmentFile=/etc/qs/qs.env
+Environment=MPLBACKEND=Agg
+ExecStart=/usr/local/bin/pixi run --manifest-path /nsls2/software/hex/hex-profile-collection/pixi.toml -e qs \
+    qs --config /etc/qs/qs.yml
+# A profile load failure is fatal on purpose: fix the profile, then restart.
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=60
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target
