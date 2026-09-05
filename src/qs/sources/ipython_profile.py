@@ -208,7 +208,10 @@ class IPythonProfileSource:
             raise FileNotFoundError(f"No .py startup files in {self._startup_dir}")
         for path in files:
             logger.info("Executing profile file %s", path.name)
-            code = compile(patch_profile_code(path.read_text()), str(path), "exec")
+            # dont_inherit: without it the profile inherits this module's
+            # `from __future__ import annotations`, turning class annotations into strings that
+            # ophyd-async's typed devices cannot resolve in the profile namespace.
+            code = compile(patch_profile_code(path.read_text()), str(path), "exec", dont_inherit=True)
             namespace["__file__"] = str(path)
             try:
                 self._exec(code, namespace)
