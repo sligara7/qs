@@ -14,3 +14,7 @@ build/
 .reflow2/graph.server.json
 .reflow2/graph.client.json
 .reflow2/loop-nudge
+
+# written into cwd by apsbits demo instrument if a test runs outside tmp_path
+.re_md_dict.yml
+*.dat
