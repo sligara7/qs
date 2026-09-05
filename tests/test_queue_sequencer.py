@@ -322,7 +322,7 @@ def test_database_unreachable_after_plan_holds_history_and_stops_queue(tmp_path:
         wait_for(lambda: len(seq.pending_history) == 1)
         wait_for(lambda: not seq.queue_running)
         assert seq.pending_history[0].exit_status == "success"
-        assert "Database unavailable" in (seq.last_error or "")
+        assert "QS-DB-UNAVAILABLE" in (seq.last_error or "")
         snap = status.snapshot()  # status keeps answering
         assert snap["qs"]["database_ok"] is False and snap["qs"]["pending_history"] == 1
         assert snap["items_in_history"] == 1 and snap["manager_state"] == "idle"

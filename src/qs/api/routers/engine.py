@@ -11,6 +11,7 @@ from qs.api.deps import Services, get_services, require_scope
 from qs.api.payload import read_payload
 from qs.api.responses import fail, fail_from, ok
 from qs.engine.host import EngineHostError, EngineState
+from qs.errors import ErrorCode
 
 router = APIRouter(tags=["run engine"])
 
@@ -152,10 +153,16 @@ async def environment_close(services: Services = Depends(get_services)) -> dict[
     if services.host.state in (EngineState.RUNNING, EngineState.PAUSED):
         return fail("A plan is running; the environment cannot be closed")
     return fail(
-        "Closing the RE environment is not supported: qs keeps the profile loaded for the life of the process"
+        "Closing the RE environment is not supported: qs keeps the profile loaded for the life of the "
+        "process",
+        code=ErrorCode.UNSUPPORTED,
     )
 
 
 @router.post("/environment/update", dependencies=[Depends(require_scope("write:execute"))])
 async def environment_update(services: Services = Depends(get_services)) -> dict[str, Any]:
-    return fail("Reloading the profile at runtime is not supported yet; restart the service", task_uid=None)
+    return fail(
+        "Reloading the profile at runtime is not supported yet; restart the service",
+        code=ErrorCode.UNSUPPORTED,
+        task_uid=None,
+    )

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 from qs.api.auth import ALL_SCOPES, Principal, SingleKeyAuthenticator
 from qs.api.deps import Services, get_principal, get_services
 from qs.api.responses import fail
+from qs.errors import ErrorCode
 
 router = APIRouter(tags=["auth"])
 
@@ -51,7 +52,8 @@ async def scopes(principal: Principal = Depends(get_principal)) -> dict[str, Any
 async def apikey_create(principal: Principal = Depends(get_principal)) -> dict[str, Any]:
     return fail(
         "Creating API keys is not supported under the single-user key; "
-        "set QSERVER_HTTP_SERVER_SINGLE_USER_API_KEY"
+        "set QSERVER_HTTP_SERVER_SINGLE_USER_API_KEY",
+        code=ErrorCode.UNSUPPORTED,
     )
 
 
@@ -72,7 +74,7 @@ async def apikey_get(
 
 @router.delete("/auth/apikey")
 async def apikey_delete(principal: Principal = Depends(get_principal)) -> dict[str, Any]:
-    return fail("Deleting API keys is not supported under the single-user key")
+    return fail("Deleting API keys is not supported under the single-user key", code=ErrorCode.UNSUPPORTED)
 
 
 @router.post("/auth/logout")
@@ -96,14 +98,16 @@ async def principal_get(
 
 @router.post("/auth/principal/{uuid}/apikey")
 async def principal_apikey(uuid: str, principal: Principal = Depends(get_principal)) -> dict[str, Any]:
-    return fail("Per-principal API keys are not supported under the single-user key")
+    return fail(
+        "Per-principal API keys are not supported under the single-user key", code=ErrorCode.UNSUPPORTED
+    )
 
 
 @router.post("/auth/session/refresh")
 async def session_refresh() -> dict[str, Any]:
-    return fail("Sessions are not supported under the single-user key")
+    return fail("Sessions are not supported under the single-user key", code=ErrorCode.UNSUPPORTED)
 
 
 @router.delete("/auth/session/revoke/{session_id}")
 async def session_revoke(session_id: str) -> dict[str, Any]:
-    return fail("Sessions are not supported under the single-user key")
+    return fail("Sessions are not supported under the single-user key", code=ErrorCode.UNSUPPORTED)

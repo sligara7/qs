@@ -10,6 +10,7 @@ from qs.api.auth import Principal
 from qs.api.deps import Services, get_principal, get_services, require_scope
 from qs.api.payload import read_payload
 from qs.api.responses import fail, fail_from, ok, unsupported
+from qs.errors import ErrorCode
 from qs.queue.models import QueueItem
 from qs.queue.service import QueueError
 from qs.sequencer import SequencerError
@@ -272,7 +273,8 @@ async def queue_mode_set(request: Request, services: Services = Depends(get_serv
         return fail("Payload must contain a dict 'mode'")
     if mode.get("ignore_failures"):
         return fail(
-            "ignore_failures is not supported: this service stops the queue on failure and waits for a human"
+            "ignore_failures is not supported: this service stops the queue on failure and waits for a human",
+            code=ErrorCode.UNSUPPORTED,
         )
     if "loop" in mode:
         services.sequencer.set_loop_mode(bool(mode["loop"]))

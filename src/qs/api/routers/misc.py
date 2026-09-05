@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Request
 from qs.api.deps import Services, get_services, require_scope
 from qs.api.payload import read_payload
 from qs.api.responses import fail, ok, unsupported
+from qs.errors import ErrorCode
 
 router = APIRouter(tags=["misc"])
 
@@ -54,6 +55,7 @@ async def lock() -> dict[str, Any]:
     return fail(
         "Locking is not supported: exclusive control comes from the queue itself (every operation runs as a "
         "plan through one RunEngine)",
+        code=ErrorCode.UNSUPPORTED,
         lock_info=_LOCK_INFO,
         lock_info_uid="",
     )
