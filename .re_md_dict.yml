@@ -1,5 +1,5 @@
 # Written by StoredDict.
-# Dictionary contents written: 2026-09-04 21:07:44.008365
+# Dictionary contents written: 2026-09-04 21:27:25.990122
 
 beamline_id: demo_instrument
 conda_prefix: /home/asligar/miniconda3
@@ -39,7 +39,7 @@ iconfig:
   XMODE_DEBUG_LEVEL: Plain
 instrument_name: Most Glorious Scientific Instrument
 login_id: asligar@lps-172683.nsls2.bnl.gov
-pid: 4091432
+pid: 22828
 proposal_id: commissioning
 versions:
   apsbits: 2.0.3

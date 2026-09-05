@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request
 
 from qs.api.deps import Services, get_services, require_scope
 from qs.api.payload import read_payload
-from qs.api.responses import fail, ok
+from qs.api.responses import fail, fail_from, ok
 from qs.engine.host import EngineHostError, EngineState
 
 router = APIRouter(tags=["run engine"])
@@ -25,7 +25,7 @@ async def re_pause(request: Request, services: Services = Depends(get_services))
         services.host.request_pause(defer=(option == "deferred"))
         return ok("")
     except Exception as exc:  # noqa: BLE001 - bluesky TransitionError etc.
-        return fail(str(exc))
+        return fail_from(exc)
 
 
 @router.post("/re/resume", dependencies=[Depends(require_scope("write:execute"))])
@@ -34,7 +34,7 @@ async def re_resume(services: Services = Depends(get_services)) -> dict[str, Any
         services.host.resume()
         return ok("")
     except EngineHostError as exc:
-        return fail(str(exc))
+        return fail_from(exc)
 
 
 @router.post("/re/abort", dependencies=[Depends(require_scope("write:execute"))])
@@ -44,7 +44,7 @@ async def re_abort(request: Request, services: Services = Depends(get_services))
         services.host.abort(reason=str(payload.get("reason", "aborted over HTTP")))
         return ok("")
     except Exception as exc:  # noqa: BLE001
-        return fail(str(exc))
+        return fail_from(exc)
 
 
 @router.post("/re/stop", dependencies=[Depends(require_scope("write:execute"))])
@@ -53,7 +53,7 @@ async def re_stop(services: Services = Depends(get_services)) -> dict[str, Any]:
         services.host.stop()
         return ok("")
     except Exception as exc:  # noqa: BLE001
-        return fail(str(exc))
+        return fail_from(exc)
 
 
 @router.post("/re/halt", dependencies=[Depends(require_scope("write:execute"))])
@@ -62,7 +62,7 @@ async def re_halt(services: Services = Depends(get_services)) -> dict[str, Any]:
         services.host.halt()
         return ok("")
     except Exception as exc:  # noqa: BLE001
-        return fail(str(exc))
+        return fail_from(exc)
 
 
 @router.get("/re/metadata", dependencies=[Depends(require_scope("read:status"))])

@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from qs import __version__
 from qs.api.deps import Services
 from qs.api.routers import auth, engine, misc, qs_devices, queue, resources, status, ws
+from qs.errors import ErrorCode
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,11 @@ def create_app(
         logger.exception("Unhandled error in %s %s", request.method, request.url.path)
         return JSONResponse(
             status_code=500,
-            content={"success": False, "msg": f"Internal error: {type(exc).__name__}: {exc}"},
+            content={
+                "success": False,
+                "code": str(ErrorCode.INTERNAL),
+                "msg": f"Internal error: {type(exc).__name__}: {exc}",
+            },
         )
 
     if smoke_page:

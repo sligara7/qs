@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, Request
 from qs.api.deps import Services, get_services, require_scope
 from qs.api.describe import describe_device
 from qs.api.payload import read_payload
-from qs.api.responses import fail, ok
+from qs.api.responses import fail, fail_from, ok
 from qs.devices.models import DeviceDefinition
 from qs.devices.service import DeviceDefinitionError
 
@@ -68,7 +68,7 @@ async def get_device(name: str, services: Services = Depends(get_services)) -> d
     try:
         return ok("", definition=_entry(services, _svc(services).get(name)))
     except DeviceDefinitionError as exc:
-        return fail(str(exc))
+        return fail_from(exc)
 
 
 @router.put("/qs/devices/{name}", dependencies=[Depends(require_scope("write:queue"))])
@@ -87,7 +87,7 @@ async def update_device(
             svc.instantiate(name)
         return ok("", definition=_entry(services, definition))
     except (DeviceDefinitionError, KeyError, TypeError, ValueError) as exc:
-        return fail(str(exc))
+        return fail_from(exc)
     except Exception as exc:  # noqa: BLE001
         return fail(f"Device could not be updated: {type(exc).__name__}: {exc}")
 
@@ -98,7 +98,7 @@ async def delete_device(name: str, services: Services = Depends(get_services)) -
         _svc(services).delete(name)
         return ok("")
     except DeviceDefinitionError as exc:
-        return fail(str(exc))
+        return fail_from(exc)
 
 
 @router.post("/qs/devices/{name}/instantiate", dependencies=[Depends(require_scope("write:queue"))])
@@ -108,7 +108,7 @@ async def instantiate_device(name: str, services: Services = Depends(get_service
         svc.instantiate(name)
         return ok("", definition=_entry(services, svc.get(name)))
     except DeviceDefinitionError as exc:
-        return fail(str(exc))
+        return fail_from(exc)
     except Exception as exc:  # noqa: BLE001
         return fail(f"Device could not be instantiated: {type(exc).__name__}: {exc}")
 
@@ -120,4 +120,4 @@ async def remove_device_instance(name: str, services: Services = Depends(get_ser
         svc.remove_instance(name)
         return ok("", definition=_entry(services, svc.get(name)))
     except DeviceDefinitionError as exc:
-        return fail(str(exc))
+        return fail_from(exc)

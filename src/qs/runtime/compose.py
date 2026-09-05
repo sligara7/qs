@@ -110,6 +110,23 @@ def build_application(
 
     registry = Registry()
     registry.load_from(load_result)
+    for name in config.ignored_environment:
+        logger.warning("[startup] ignoring %s: not applicable to qs (HTTP only; no 0MQ, kernel, lock)", name)
+    if config.http.api_key:
+        auth = "single-user API key"
+    elif config.http.allow_anonymous:
+        auth = "anonymous access"
+    else:
+        auth = "generated key"
+    logger.info(
+        "[startup] http://%s:%d, %s, database %s, progress stream %s, console capture %s",
+        config.http.host,
+        config.http.port,
+        auth,
+        _redact(config.database.url),
+        "on" if config.engine.stream_device_progress else "off",
+        "on" if config.engine.capture_console else "off",
+    )
 
     database = Database(config.database.url)
     database.create_all()
@@ -152,3 +169,11 @@ def build_application(
     )
     app = create_app(services, allow_origins=config.http.allow_origins, smoke_page=config.http.smoke_page)
     return Application(config=config, services=services, app=app, database=database)
+
+
+def _redact(url: str) -> str:
+    """Hide credentials in a database URL for logs."""
+    if "@" in url and "://" in url:
+        scheme, rest = url.split("://", 1)
+        return f"{scheme}://***@{rest.split('@', 1)[1]}"
+    return url

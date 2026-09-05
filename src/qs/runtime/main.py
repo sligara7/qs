@@ -8,7 +8,11 @@ import sys
 from typing import Any
 
 from qs import __version__
+from qs.diagnostics import configure_logging, summarize
+from qs.errors import ErrorCode
 from qs.runtime.config import load_config
+
+logger = logging.getLogger("qs.runtime")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -44,9 +48,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    logging.basicConfig(
-        level=args.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s: %(message)s"
-    )
+    configure_logging(args.log_level)
     overrides: dict[str, Any] = {
         "startup.startup_dir": args.startup_dir,
         "startup.startup_module": args.startup_module,
@@ -79,7 +81,11 @@ def main(argv: list[str] | None = None) -> int:
         if server is not None:
             server.should_exit = True
 
-    application = build_application(config, shutdown_callback=request_shutdown)
+    try:
+        application = build_application(config, shutdown_callback=request_shutdown)
+    except Exception as exc:  # noqa: BLE001 - a profile that does not load is fatal on purpose
+        _log_load_failure(exc)
+        return 1
     uv_config = uvicorn.Config(
         application.app,
         host=config.http.host,
@@ -97,6 +103,17 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+def _log_load_failure(exc: BaseException) -> None:
+    summary = summarize(exc)
+    logger.error(
+        "[%s] the profile did not load: %s. Fix the profile (or the IOC it needs) and restart; "
+        "`qs --list-plans` reproduces the load without serving.",
+        ErrorCode.PROFILE_LOAD,
+        summary.headline,
+    )
+    logger.debug("Traceback:\n%s", summary.traceback)
+
+
 def list_plans(config: Any, out: Any = None) -> int:
     """Load the profile the way the service would and print what it found (no server)."""
     from qs.engine import EngineHost, EventBus
@@ -107,7 +124,11 @@ def list_plans(config: Any, out: Any = None) -> int:
     host = EngineHost(events=EventBus())
     host.start()
     try:
-        result = host.load_source(make_source(config))
+        try:
+            result = host.load_source(make_source(config))
+        except Exception as exc:  # noqa: BLE001
+            _log_load_failure(exc)
+            return 1
         registry = Registry()
         registry.load_from(result)
         print(f"# {result.source_description}", file=out)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -14,9 +15,12 @@ from qs.api.streams import EventBroadcaster
 from qs.devices.service import DeviceDefinitionService
 from qs.engine.events import EventBus
 from qs.engine.host import EngineHost
+from qs.errors import ErrorCode
 from qs.queue.service import QueueService
 from qs.registry import Registry
 from qs.sequencer import Sequencer
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -45,6 +49,10 @@ def get_principal(request: Request, services: Services = Depends(get_services)) 
         return services.authenticator.authenticate(credential)
     except Exception as exc:  # AuthenticationError or anything else the authenticator raises
         status_code = getattr(exc, "status_code", 401)
+        client = request.client.host if request.client else "?"
+        logger.warning(
+            "[%s] %s %s from %s refused: %s", ErrorCode.AUTH, request.method, request.url.path, client, exc
+        )
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 

@@ -91,6 +91,26 @@ the result read-only in `/api/status` under `qs.experiment` (`data_session`, `cy
 `proposal`, `username`, `start_datetime`) and, with `engine.require_synced_experiment`,
 refuses `queue/start` and autostart until `data_session` is set.
 
+### Reading the logs
+
+`journalctl -fu qs.service` is meant to tell the story without the code. Every fault is one
+line: a code from `docs/errors.md`, the layer in brackets, the item, the root cause and what qs
+did, for example
+
+```
+ERROR qs.sequencer.sequencer: [QS-PLAN-FAIL] tomo_dark_flat 80930add fail after 6.1 s: AttributeError: 'HEXKinetixDetector' object has no attribute '_writer' (at 85-fly-plans.py:133 in tomo_dark_flat); queue stopped, waiting for a human
+ERROR qs.sequencer.sequencer: [QS-PLAN-FAIL] count 43dbda96 fail after 23.9 s: TimeoutError: ca://XF:27ID1-BI{Kinetix-Det:1}HDF1:Capture; queue stopped, waiting for a human
+```
+
+The root cause is the innermost exception (through bluesky's `FailedStatus` into the device
+status), and `at file:line in function` names the deepest frame inside the profile. State
+changes get one INFO line each (`[queue] started: 3 item(s) to run`, `[engine] idle -> running`,
+`[queue] empty, idle`). Tracebacks, from qs and from every library, are kept out of INFO and
+above and shown only with `--log-level DEBUG`; the full traceback of a failed item is always in
+its history entry over HTTP. The same code appears in `qs.last_error` and in the `code` field of
+HTTP failure bodies; `docs/errors.md` (generated from `src/qs/errors.py`) explains each code and
+its remedy.
+
 ### When the database goes away
 
 A plan that is running is never touched. If the queue database is unreachable when an item

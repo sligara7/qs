@@ -28,6 +28,7 @@ from typing import Any
 
 from bluesky.run_engine import RunEngine, RunEngineInterrupted
 
+from qs.diagnostics import summarize
 from qs.engine.events import EventBus
 from qs.engine.progress import ProgressWatcher
 from qs.sources.protocol import LoadResult, ProfileSource
@@ -63,6 +64,9 @@ class PlanOutcome:
     traceback: str = ""
     plan_result: Any = None
     extra: dict[str, Any] = field(default_factory=dict)
+
+    root_cause: str = ""  # innermost exception, e.g. "TimeoutError: ca://..."
+    where: str = ""  # deepest frame in profile code, e.g. "85-fly-plans.py:133 in tomo_dark_flat"
 
     @property
     def succeeded(self) -> bool:
@@ -373,6 +377,7 @@ class EngineHost:
                     previous_state_hook(new_state, old_state)
                 except Exception:  # noqa: BLE001
                     logger.exception("Profile state_hook raised; continuing")
+            logger.info("[engine] %s -> %s", old_state, new_state)
             self._events.emit("re_state", state=str(new_state), previous=str(old_state))
 
         engine.state_hook = state_hook
@@ -412,6 +417,8 @@ class EngineHost:
                 reason=str(exc),
                 exception=f"{type(exc).__name__}: {exc}",
                 traceback=traceback.format_exc(),
+                root_cause=summarize(exc).root,
+                where=summarize(exc).where,
                 run_uids=self._collect_run_uids(),
             )
         finally:
@@ -452,6 +459,8 @@ class EngineHost:
                     reason=str(exc),
                     exception=f"{type(exc).__name__}: {exc}",
                     traceback=traceback.format_exc(),
+                    root_cause=summarize(exc).root,
+                    where=summarize(exc).where,
                     run_uids=self._collect_run_uids(),
                 )
 
@@ -473,12 +482,16 @@ class EngineHost:
         # bluesky returns a RunEngineResult when _call_returns_result is True.
         exit_status = getattr(result, "exit_status", None) or "success"
         exc = getattr(result, "exception", None)
+        summary = summarize(exc) if isinstance(exc, BaseException) else None
         return PlanOutcome(
             item_uid=item_uid,
             exit_status=str(exit_status),
             run_uids=tuple(getattr(result, "run_start_uids", ()) or ()),
             reason=str(getattr(result, "reason", "") or ""),
             exception="" if exc is None else f"{type(exc).__name__}: {exc}",
+            traceback=summary.traceback if summary else "",
+            root_cause=summary.root if summary else "",
+            where=summary.where if summary else "",
             plan_result=getattr(result, "plan_result", None),
             extra={"interrupted": bool(getattr(result, "interrupted", False))},
         )

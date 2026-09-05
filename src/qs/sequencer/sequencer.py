@@ -20,6 +20,7 @@ from typing import Any
 
 from qs.engine.events import EventBus
 from qs.engine.host import EngineHost, EngineHostError, EngineState, PlanOutcome
+from qs.errors import ErrorCode
 from qs.queue.models import HistoryEntry, ItemState, QueueItem
 from qs.queue.service import QueueError, QueueService
 from qs.registry import Registry, RegistryError
@@ -36,6 +37,12 @@ _EXIT_TO_STATE = {
 
 
 class SequencerError(RuntimeError):
+    """A refused queue operation; ``code`` names the catalogue entry (docs/errors.md)."""
+
+    def __init__(self, message: str, code: ErrorCode = ErrorCode.QUEUE_REFUSED) -> None:
+        super().__init__(message)
+        self.code = code
+
     pass
 
 
@@ -122,7 +129,8 @@ class Sequencer:
             return
         if not self._host.experiment_metadata().get("data_session"):
             raise SequencerError(
-                "No experiment synced: RE.md has no 'data_session'. Run sync-experiment first."
+                "No experiment synced: RE.md has no 'data_session'. Run sync-experiment first.",
+                ErrorCode.EXPERIMENT_UNSYNCED,
             )
 
     @property
@@ -153,15 +161,18 @@ class Sequencer:
             raise SequencerError(
                 f"Database unavailable ({self._database_error}); {pending} history "
                 f"{'entry is' if pending == 1 else 'entries are'} held in memory. "
-                "Fix the database, then start the queue again."
+                "Fix the database, then start the queue again.",
+                ErrorCode.DB_UNAVAILABLE,
             )
         with self._lock:
             if self._host.state is EngineState.NO_ENGINE:
                 raise SequencerError("No profile loaded; the queue cannot start")
             if len(self._queue) == 0:
-                raise SequencerError("Queue is empty.")  # queueserver's wording
+                raise SequencerError("Queue is empty.", ErrorCode.QUEUE_EMPTY)  # queueserver's wording
             self._running = True
             self._stop_pending = False
+            n_items = len(self._queue)
+        logger.info("[queue] started: %d item(s) to run", n_items)
         self._events.emit("queue_state", running=True, stop_pending=False, autostart=self._autostart)
         self._wakeup.set()
 
@@ -171,11 +182,13 @@ class Sequencer:
             if not self._running:
                 raise SequencerError("The queue is not running")
             self._stop_pending = True
+        logger.info("[queue] stop requested: the current item finishes, then the queue stops")
         self._events.emit("queue_state", running=True, stop_pending=True, autostart=self._autostart)
 
     def queue_stop_cancel(self) -> None:
         with self._lock:
             self._stop_pending = False
+        logger.info("[queue] stop request withdrawn")
         self._events.emit("queue_state", running=self._running, stop_pending=False, autostart=self._autostart)
 
     def set_autostart(self, enable: bool) -> None:
@@ -183,6 +196,7 @@ class Sequencer:
             self._check_experiment()
         with self._lock:
             self._autostart = bool(enable)
+        logger.info("[queue] autostart %s", "on" if enable else "off")
         self._events.emit(
             "queue_state", running=self._running, stop_pending=self._stop_pending, autostart=enable
         )
@@ -212,6 +226,9 @@ class Sequencer:
                 with self._lock:
                     self._running = False
                     self._stop_pending = False
+                logger.info(
+                    "[queue] empty, idle%s", "; autostart will run the next item" if self._autostart else ""
+                )
                 self._events.emit(
                     "queue_state",
                     running=False,
@@ -229,10 +246,12 @@ class Sequencer:
             if self._running and self._stop_pending:
                 self._running = False
                 self._stop_pending = False
+                logger.info("[queue] stopped as requested")
                 self._events.emit("queue_state", running=False, stop_pending=False, autostart=self._autostart)
                 return False
             if self._autostart and not self._running and len(self._queue) > 0:
                 self._running = True
+                logger.info("[queue] autostart: %d item(s) arrived, running", len(self._queue))
                 self._events.emit("queue_state", running=True, stop_pending=False, autostart=True)
             return self._running and self._host.state is EngineState.IDLE
 
@@ -267,6 +286,7 @@ class Sequencer:
         # Keep the item reported as running until its history row and the queue state are
         # written, so a client polling status never sees "idle, nothing running" before the
         # outcome is visible.
+        headline = self._log_outcome(item, outcome, time.time() - time_start)
         self._record(item, outcome, time_start)
         if outcome.succeeded:
             if self._loop_mode:
@@ -276,7 +296,7 @@ class Sequencer:
             with self._lock:
                 self._running = False
                 self._stop_pending = False
-            self._last_error = outcome.exception or outcome.reason or outcome.exit_status
+            self._last_error = headline
             self._events.emit(
                 "queue_state",
                 running=False,
@@ -285,6 +305,29 @@ class Sequencer:
                 reason=self._last_error,
             )
         self._running_item = None
+
+    @staticmethod
+    def _log_outcome(item: QueueItem, outcome: PlanOutcome, elapsed: float) -> str:
+        """One line an operator can act on; returns it for ``last_error``. Traceback only at DEBUG."""
+        label = f"{item.name} {item.item_uid[:8]}"
+        if outcome.succeeded:
+            logger.info("[plan] %s succeeded in %.1f s (%d run(s))", label, elapsed, len(outcome.run_uids))
+            return ""
+        if (outcome.exception or "").startswith(("RegistryError", "QueueError")):
+            code = ErrorCode.ITEM_INVALID
+        else:
+            code = {
+                "abort": ErrorCode.PLAN_ABORT,
+                "halt": ErrorCode.PLAN_HALT,
+                "stop": ErrorCode.PLAN_STOP,
+            }.get(outcome.exit_status, ErrorCode.PLAN_FAIL)
+        cause = outcome.root_cause or outcome.exception or outcome.reason or outcome.exit_status
+        where = f" (at {outcome.where})" if outcome.where else ""
+        headline = f"[{code}] {label} {outcome.exit_status} after {elapsed:.1f} s: {cause}{where}"
+        logger.error("%s; queue stopped, waiting for a human", headline)
+        if outcome.traceback:
+            logger.debug("Traceback for %s:\n%s", label, outcome.traceback)
+        return headline
 
     def _record(self, item: QueueItem, outcome: PlanOutcome, time_start: float) -> None:
         entry = HistoryEntry(
@@ -306,18 +349,13 @@ class Sequencer:
             # (flush on the next queue_start). The queue stops so nothing runs unrecorded.
             self._pending_history.append(entry)
             self._database_error = f"{type(exc).__name__}: {exc}"
-            logger.error(
-                "History for %s (%s) could not be written; holding it in memory: %s",
-                item.name,
-                item.item_uid,
-                self._database_error,
+            self._last_error = (
+                f"[{ErrorCode.DB_UNAVAILABLE}] {self._database_error}: outcome of {item.name} "
+                f"{item.item_uid[:8]} ({outcome.exit_status}) held in memory; queue stopped"
             )
+            logger.error("%s; restore the database, then start the queue", self._last_error)
             with self._lock:
                 self._running = False
-            self._last_error = (
-                f"Database unavailable: {self._database_error}. Outcome of {item.name} "
-                f"({outcome.exit_status}) is held in memory; the queue stopped."
-            )
         self._events.emit(
             "item_finished", item_uid=item.item_uid, name=item.name, exit_status=outcome.exit_status
         )

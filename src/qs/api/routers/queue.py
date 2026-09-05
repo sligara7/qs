@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from qs.api.auth import Principal
 from qs.api.deps import Services, get_principal, get_services, require_scope
 from qs.api.payload import read_payload
-from qs.api.responses import fail, ok, unsupported
+from qs.api.responses import fail, fail_from, ok, unsupported
 from qs.queue.models import QueueItem
 from qs.queue.service import QueueError
 from qs.sequencer import SequencerError
@@ -106,7 +106,7 @@ async def item_add_batch(
             results.append(ok(""))
         except (QueueError, KeyError, TypeError) as exc:
             all_ok = False
-            results.append(fail(str(exc)))
+            results.append(fail_from(exc))
     if not all_ok:
         return fail(
             "Some items are invalid; nothing was added",
@@ -237,7 +237,7 @@ async def queue_start(services: Services = Depends(get_services)) -> dict[str, A
         services.sequencer.queue_start()
         return ok("")
     except SequencerError as exc:
-        return fail(str(exc))
+        return fail_from(exc)
 
 
 @router.post("/queue/stop", dependencies=[Depends(require_scope("write:execute"))])
@@ -246,7 +246,7 @@ async def queue_stop(services: Services = Depends(get_services)) -> dict[str, An
         services.sequencer.queue_stop()
         return ok("")
     except SequencerError as exc:
-        return fail(str(exc))
+        return fail_from(exc)
 
 
 @router.post("/queue/stop/cancel", dependencies=[Depends(require_scope("write:execute"))])
