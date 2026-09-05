@@ -48,6 +48,7 @@ packages = ["src/qs"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # `from tests._live_server import ...` under `uv run pytest` as well as `python -m pytest`
 asyncio_mode = "auto"
 markers = [
     "acceptance: needs a running simulated beamline (QS_HEX_SIM_URL); skipped otherwise",
