@@ -22,17 +22,18 @@ sim (set VMAX to a few deg/s and ERES to 0.005 deg/count); run the encoder bridg
 `--offset 0 --rate-hz 1000 --max-step 1` so PCOMP sees a continuous position that matches
 hextools' counts = deg / ERES convention.
 
-Trial-only patches in this directory, each a gap found on 2026-09-04:
+Trial-only patches in this directory (gaps found on 2026-09-04; the sim-side ones are fixed in hex-ob main as of the same day, so only the hextools shim remains):
 
 | file | works around |
 |---|---|
-| `05-sim-kinetix.py` | Kinetix IOC offering TriggerMode `Internal/External` instead of `Internal/Rising Edge/Exp. Gate`. The sim sets the Kinetix choices in `iocs/kinetix/init_kinetix.py` at bring-up and loses them when the container restarts; re-run that script and this shim is unnecessary |
-| `10-devices.py` (mock shutters) | sim blackhole serves shutter PVs with CA types hextools' `Shutter` rejects |
 | `15-shims.py` | hextools main builds `StandardFlyable(logic)` and implements `prepare/kickoff/complete`; the pinned fork wants `logic.with_device()` and `on_prepare/on_kickoff/on_complete` |
 
-Result: profile loads (5 devices, 5 plans), `count`/`mv` succeed, `tomo_flyscan` with the
-PandA alone runs prepare → kickoff → motor fly → PCOMP fires → 1 row captured, then times
-out because the sim's PandA PULSE block emits one pulse of the requested train (the sim's own
-`slowmove_capture_test.py` shows the same 1-of-5). With `kinetix1` included the detector
-kickoff fails because ADSimDetector ignores external triggering and has already taken its
-frames. Both limits are in the simulator, not qs or hextools.
+Result (2026-09-04, after the sim fixes landed in hex-ob main): profile loads (5 devices,
+5 plans, stock hextools/ophyd-async classes, no device shims), `count`/`mv` succeed, and
+`tomo_flyscan` with the PandA alone runs to **success: 5 of 5 rows captured, run in Tiled
+with 5 primary events**. Requirements on the sim side: motor `VMAX` <= 10 deg/s (the sim's
+default now) and the encoder bridge run as `--offset 0 --rate-hz 2000 --max-step 2`
+(hextools' time-based PCOMP uses STEP=2 counts, so the injected position may not jump by
+more). With `kinetix1` included the detector kickoff still fails because ADSimDetector
+ignores external triggering and has already taken its frames; that is the one remaining
+simulator limit for the camera path.
