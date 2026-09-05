@@ -10,7 +10,7 @@ Honoured environment variables (same meaning as in the predecessors):
   ``QSERVER_HTTP_SERVER_ALLOW_ORIGINS``, ``QSERVER_HTTP_SERVER_RESPONSE_BYTESIZE_LIMIT``.
 
 qs-specific variables: ``QS_STARTUP_DIR``, ``QS_STARTUP_MODULE``, ``QS_DATABASE_URL``,
-``QS_HTTP_HOST``, ``QS_HTTP_PORT``, ``QS_STREAM_DEVICE_PROGRESS``.
+``QS_HTTP_HOST``, ``QS_HTTP_PORT``, ``QS_STREAM_DEVICE_PROGRESS``, ``QS_REQUIRE_SYNCED_EXPERIMENT``.
 
 Not applicable, by design: ``QSERVER_ZMQ_*`` (HTTP only), ``QSERVER_EMERGENCY_LOCK_KEY_FOR_SERVER``
 (the queue is the lock), ``QSERVER_USE_IPYTHON_KERNEL`` and ``QSERVER_IPYTHON_KERNEL_*`` (no kernel).
@@ -68,6 +68,9 @@ class EngineConfig:
     progress_min_update_period: float = 0.2
     permitted_re_metadata_keys: list[str] = field(default_factory=lambda: ["/"])
     capture_console: bool = True
+    # Refuse queue_start/autostart while the profile's RE.md has no synced experiment
+    # (nslsii sync-experiment writes data_session/cycle/proposal into the shared Redis RE.md).
+    require_synced_experiment: bool = False
 
 
 @dataclass
@@ -123,6 +126,8 @@ def _apply_environment(config: Config, env: Mapping[str, str]) -> None:
         config.http.response_bytesize_limit = int(env["QSERVER_HTTP_SERVER_RESPONSE_BYTESIZE_LIMIT"])
     if env.get("QSERVER_PERMITTED_RE_METADATA_KEYS"):
         config.engine.permitted_re_metadata_keys = env["QSERVER_PERMITTED_RE_METADATA_KEYS"].split(":")
+    if "QS_REQUIRE_SYNCED_EXPERIMENT" in env:
+        config.engine.require_synced_experiment = _truthy(env["QS_REQUIRE_SYNCED_EXPERIMENT"])
     if env.get("QS_STARTUP_DIR"):
         config.startup.kind = "ipython"
         config.startup.startup_dir = env["QS_STARTUP_DIR"]

@@ -28,6 +28,7 @@ dev = [
     "websockets>=12",
     "ruff>=0.4",
     "mypy>=1.9",
+    "playwright>=1.45",
 ]
 
 [project.scripts]
@@ -43,6 +44,10 @@ packages = ["src/qs"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "acceptance: needs a running simulated beamline (QS_HEX_SIM_URL); skipped otherwise",
+    "ui: drives a browser with Playwright; skipped when unavailable",
+]
 
 [tool.ruff]
 line-length = 110

@@ -21,7 +21,7 @@ import os
 import queue
 import threading
 import traceback
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from typing import Any
@@ -67,6 +67,21 @@ class PlanOutcome:
     @property
     def succeeded(self) -> bool:
         return self.exit_status == "success"
+
+
+def _plain(value: Any) -> Any:
+    """Copy a metadata value into plain JSON types.
+
+    A Redis-backed RE.md hands back its own mapping and sequence types (redis_json_dict's
+    ObservableMapping), which JSON encoders refuse; status must never fail because of that.
+    """
+    if isinstance(value, Mapping):
+        return {str(k): _plain(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_plain(v) for v in value]
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
 
 
 def _callback_name(cb: Any) -> str:
@@ -187,6 +202,24 @@ class EngineHost:
     @property
     def last_error(self) -> str | None:
         return self._last_error
+
+    EXPERIMENT_KEYS = ("data_session", "cycle", "proposal", "username", "start_datetime")
+
+    def experiment_metadata(self) -> dict[str, Any]:
+        """The synced experiment as the profile's RE.md records it (read-only).
+
+        At NSLS-II ``sync-experiment`` writes these keys into a Redis-backed RE.md shared by every
+        process on the beamline; qs only reads them. Read directly (not on the engine thread) so a
+        running plan cannot block a status request; a mapping error is reported, not raised.
+        """
+        engine = self._engine
+        if engine is None:
+            return {}
+        try:
+            md = engine.md
+            return {key: _plain(md[key]) for key in self.EXPERIMENT_KEYS if md.get(key) is not None}
+        except Exception as exc:  # noqa: BLE001 - RE.md may be a network-backed mapping
+            return {"error": f"{type(exc).__name__}: {exc}"}
 
     def subscribers(self) -> dict[str, list[str]]:
         """Names of the callbacks subscribed to the engine, per document type (read-only).

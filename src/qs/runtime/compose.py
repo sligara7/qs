@@ -115,7 +115,13 @@ def build_application(
     database.create_all()
     queue = QueueService(SqlQueueRepository(database), registry)
 
-    sequencer = Sequencer(host=host, queue=queue, registry=registry, events=events)
+    sequencer = Sequencer(
+        host=host,
+        queue=queue,
+        registry=registry,
+        events=events,
+        require_synced_experiment=config.engine.require_synced_experiment,
+    )
     status = StatusReporter(host=host, queue=queue, sequencer=sequencer, registry=registry)
 
     devices = DeviceDefinitionService(

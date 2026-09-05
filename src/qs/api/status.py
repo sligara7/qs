@@ -95,6 +95,8 @@ class StatusReporter:
                 "engine_adopted": host.engine_adopted,
                 "last_error": host.last_error or seq.last_error,
                 "engine_subscribers": host.subscribers(),
+                "experiment": host.experiment_metadata(),
+                "require_synced_experiment": seq.require_synced_experiment,
             },
         }
 

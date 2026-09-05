@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 
 import pytest
@@ -380,3 +380,33 @@ def test_device_definition_crud_and_use_in_plan(client: TestClient) -> None:
     assert "m2" not in client.get("/api/devices/allowed").json()["devices_allowed"]
     assert client.delete("/api/qs/devices/m2").json()["success"]
     assert client.get("/api/qs/devices/m2").json()["success"] is False
+
+
+def test_status_shows_the_synced_experiment(client: TestClient, application: Application) -> None:
+    # nslsii sync-experiment writes these keys into the profile's RE.md; qs shows them read-only.
+    host = application.services.host
+
+    class RedisLikeMapping(Mapping):  # what redis_json_dict hands back for nested values
+        def __init__(self, data: dict) -> None:
+            self._data = data
+
+        def __getitem__(self, key: str):
+            return self._data[key]
+
+        def __iter__(self):
+            return iter(self._data)
+
+        def __len__(self) -> int:
+            return len(self._data)
+
+    proposal = RedisLikeMapping({"pi_name": "A. Sligar"})
+    host.call(
+        lambda: host.engine.md.update(
+            {"data_session": "pass-314159", "cycle": "2026-3", "proposal": proposal}
+        )
+    )
+    qs_section = status(client)["qs"]
+    assert qs_section["experiment"]["data_session"] == "pass-314159"
+    assert qs_section["experiment"]["proposal"] == {"pi_name": "A. Sligar"}  # serialised as a plain dict
+    assert qs_section["require_synced_experiment"] is False
+    host.call(lambda: [host.engine.md.pop(k, None) for k in ("data_session", "cycle", "proposal")])

@@ -30,6 +30,59 @@ src/qs/
 tests/
 ```
 
+## Configuration
+
+Everything can be set three ways; later entries win:
+
+1. a YAML file named by `--config` or `QSERVER_CONFIG` (sections `startup`, `database`,
+   `http`, `engine`, `tiled`; see `tools/qs-hex-sim.example.yml`),
+2. environment variables (`QSERVER_*` names carried over from bluesky-queueserver /
+   bluesky-httpserver where the concern survives, `QS_*` for the rest),
+3. flags on the `qs` command (`qs --help`).
+
+| setting | YAML | environment | flag |
+|---|---|---|---|
+| HTTP port (default 60610, finch's default) | `http.port` | `QS_HTTP_PORT` | `--port` |
+| bind address (default 127.0.0.1; TLS at a reverse proxy) | `http.host` | `QS_HTTP_HOST` | `--host` |
+| single-user API key | `http.api_key` | `QSERVER_HTTP_SERVER_SINGLE_USER_API_KEY` | `--api-key` |
+| CORS origins (finch dev server) | `http.allow_origins` | `QSERVER_HTTP_SERVER_ALLOW_ORIGINS` | |
+| profile startup directory | `startup.startup_dir` | `QS_STARTUP_DIR` | `--startup-dir` |
+| queue database (any SQLAlchemy URL) | `database.url` | `QS_DATABASE_URL` | `--database-url` |
+| stream device progress on the info websocket | `engine.stream_device_progress` | `QS_STREAM_DEVICE_PROGRESS` | |
+| refuse to run until an experiment is synced | `engine.require_synced_experiment` | `QS_REQUIRE_SYNCED_EXPERIMENT` | |
+
+The profile runs in-process and inherits the service's environment unchanged, so beamline
+variables it needs (`BEAMLINE_ACRONYM` / `ENDSTATION_ACRONYM` for `nslsii`'s path providers,
+Redis, Tiled and Kafka settings) are set on the service, exactly as for an IPython session.
+
+### The synced experiment
+
+At NSLS-II `sync-experiment` (from `nslsii`) writes the proposal into the Redis-backed
+`RE.md` the profile shares with every process on the beamline. qs does not run it; it shows
+the result read-only in `/api/status` under `qs.experiment` (`data_session`, `cycle`,
+`proposal`, `username`, `start_datetime`) and, with `engine.require_synced_experiment`,
+refuses `queue/start` and autostart until `data_session` is set.
+
+## Testing
+
+```
+uv run pytest                       # unit + integration; UI and acceptance tests skip themselves
+uv run playwright install chromium  # once, for tests/ui (or an installed Chrome is used)
+```
+
+- `tests/` — engine host, queue, sequencer, HTTP API, bluesky-queueserver-api client, finch
+  call replay (`tools/finch_client_check.mjs`, needs Node), and the Playwright smoke-page test.
+- `tests/acceptance/` — successful plans and failure drills against the simulated HEX
+  beamline (`hex-ob/hex-simulated-beamline`, referenced, never vendored). Run with
+  `QS_HEX_SIM_URL=http://127.0.0.1:60610 QS_API_KEY=... uv run pytest -m acceptance` once
+  qs serves the HEX profile (`tools/qs-hex-sim.example.yml`) and the sim's `scripts/env.sh`
+  is sourced. `tools/hex_sim_fault_tests.sh` is the shell form of the same drills.
+- `.github/workflows/ci.yml` runs lint and the suite per pull request;
+  `sim-acceptance.yml` runs the acceptance layer nightly / on demand (advisory).
+- `tools/finch_playwright_check.py` drives finch's dev app against qs with Playwright
+  (`docs/finch-queue-server-on-qs.png` is its output); `tools/hextools-sim-profile/` is the
+  hextools trial profile.
+
 ## Development
 
 ```

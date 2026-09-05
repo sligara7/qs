@@ -240,3 +240,40 @@ def test_queue_persists_across_service_restart(tmp_path: Path) -> None:
     assert [i.item_uid for i in q2.items()] == [a.item_uid]
     assert q2.items()[0].kwargs == {"num": 5}
     db2.dispose()
+
+
+def test_require_synced_experiment_guards_start_and_autostart(tmp_path: Path) -> None:
+    # dec:open-nslsii-sync-experiment-and-providers: sync-experiment writes data_session into the
+    # shared RE.md; with the flag on, qs refuses to run anything until it is there.
+    events = EventBus()
+    host = EngineHost(events=events)
+    host.start()
+    try:
+        load = host.load_source(IPythonProfileSource(PROFILE))
+        registry = Registry()
+        registry.load_from(load)
+        queue = QueueService(InMemoryQueueRepository(), registry)
+        seq = Sequencer(
+            host=host,
+            queue=queue,
+            registry=registry,
+            events=events,
+            poll_interval=0.05,
+            require_synced_experiment=True,
+        )
+        seq.start_thread()
+        queue.add(QueueItem(name="count", args=[["det"]], kwargs={"num": 1}))
+        with pytest.raises(SequencerError, match="No experiment synced"):
+            seq.queue_start()
+        with pytest.raises(SequencerError, match="No experiment synced"):
+            seq.set_autostart(True)
+        assert host.experiment_metadata() == {}
+
+        host.call(lambda: host.engine.md.update({"data_session": "pass-123456", "cycle": "2026-3"}))
+        assert host.experiment_metadata() == {"data_session": "pass-123456", "cycle": "2026-3"}
+        seq.queue_start()
+        wait_for(lambda: len(queue.history()) == 1)
+        assert queue.history()[0].exit_status == "success"
+        seq.close()
+    finally:
+        host.shutdown()

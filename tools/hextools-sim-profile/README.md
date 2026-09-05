@@ -26,7 +26,7 @@ Trial-only patches in this directory, each a gap found on 2026-09-04:
 
 | file | works around |
 |---|---|
-| `05-sim-kinetix.py` | sim Kinetix IOC offers TriggerMode `Internal/External`, ophyd-async expects `Internal/Rising Edge/Exp. Gate` |
+| `05-sim-kinetix.py` | Kinetix IOC offering TriggerMode `Internal/External` instead of `Internal/Rising Edge/Exp. Gate`. The sim sets the Kinetix choices in `iocs/kinetix/init_kinetix.py` at bring-up and loses them when the container restarts; re-run that script and this shim is unnecessary |
 | `10-devices.py` (mock shutters) | sim blackhole serves shutter PVs with CA types hextools' `Shutter` rejects |
 | `15-shims.py` | hextools main builds `StandardFlyable(logic)` and implements `prepare/kickoff/complete`; the pinned fork wants `logic.with_device()` and `on_prepare/on_kickoff/on_complete` |
 

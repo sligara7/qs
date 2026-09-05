@@ -48,12 +48,14 @@ class Sequencer:
         registry: Registry,
         events: EventBus,
         poll_interval: float = 0.1,
+        require_synced_experiment: bool = False,
     ) -> None:
         self._host = host
         self._queue = queue
         self._registry = registry
         self._events = events
         self._poll_interval = poll_interval
+        self._require_synced_experiment = require_synced_experiment
 
         self._lock = threading.Lock()
         self._wakeup = threading.Event()
@@ -108,7 +110,21 @@ class Sequencer:
 
     # ---- control (httpserver semantics) -------------------------------------------
 
+    @property
+    def require_synced_experiment(self) -> bool:
+        return self._require_synced_experiment
+
+    def _check_experiment(self) -> None:
+        """Refuse to run when the profile's RE.md has no synced experiment (data_session)."""
+        if not self._require_synced_experiment:
+            return
+        if not self._host.experiment_metadata().get("data_session"):
+            raise SequencerError(
+                "No experiment synced: RE.md has no 'data_session'. Run sync-experiment first."
+            )
+
     def queue_start(self) -> None:
+        self._check_experiment()
         with self._lock:
             if self._host.state is EngineState.NO_ENGINE:
                 raise SequencerError("No profile loaded; the queue cannot start")
@@ -133,6 +149,8 @@ class Sequencer:
         self._events.emit("queue_state", running=self._running, stop_pending=False, autostart=self._autostart)
 
     def set_autostart(self, enable: bool) -> None:
+        if enable:
+            self._check_experiment()
         with self._lock:
             self._autostart = bool(enable)
         self._events.emit(

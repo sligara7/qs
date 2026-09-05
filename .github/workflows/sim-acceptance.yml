@@ -1,0 +1,83 @@
+name: Simulated HEX beamline acceptance
+
+# dec:open-ci-with-sim-and-hextools: the sim is REFERENCED, never vendored. This job clones
+# hex-ob/hex-simulated-beamline and hex-profile-collection at pinned refs, brings the sim up,
+# starts qs on the real HEX profile and runs tests/acceptance (successful plans + failure modes).
+# It is advisory: scheduled nightly and on demand, never a required check. If the sim images
+# cannot be built or pulled on GitHub-hosted runners, run it on a self-hosted runner instead.
+#
+# Secrets/variables (repository settings):
+#   HEX_SIM_TOKEN  - token that can read the two repositories (they may be private).
+#   HEX_SIM_REF    - git ref of hex-ob/hex-simulated-beamline to test against (default main).
+#   HEX_PROFILE_REF - git ref of hex-profile-collection (default main).
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      sim_ref:
+        description: hex-simulated-beamline ref
+        default: main
+      profile_ref:
+        description: hex-profile-collection ref
+        default: main
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      QS_API_KEY: ci-hex
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: qs
+      - uses: actions/checkout@v4
+        with:
+          repository: hex-ob/hex-simulated-beamline
+          ref: ${{ inputs.sim_ref || vars.HEX_SIM_REF || 'main' }}
+          token: ${{ secrets.HEX_SIM_TOKEN || github.token }}
+          path: hex-simulated-beamline
+      - uses: actions/checkout@v4
+        with:
+          repository: NSLS2/hex-profile-collection
+          ref: ${{ inputs.profile_ref || vars.HEX_PROFILE_REF || 'main' }}
+          token: ${{ secrets.HEX_SIM_TOKEN || github.token }}
+          path: hex-profile-collection
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          manifest-path: hex-profile-collection/pixi.toml
+          environments: terminal
+      - name: Bring the simulated beamline up
+        working-directory: hex-simulated-beamline
+        run: |
+          ./scripts/up_all.sh
+          ./scripts/seed.sh
+      - name: Start qs on the HEX profile
+        working-directory: hex-profile-collection
+        run: |
+          set -a; source ../hex-simulated-beamline/scripts/env.sh; set +a
+          export HEX_SIM=1 MPLBACKEND=Agg PYTHONPATH=$GITHUB_WORKSPACE/qs/src
+          export QSERVER_HTTP_SERVER_SINGLE_USER_API_KEY=$QS_API_KEY
+          sed "s#<scratch>#$RUNNER_TEMP#; s#/home/asligar/git_projects/hex-profile-collection#$PWD#" \
+            ../qs/tools/qs-hex-sim.example.yml > $RUNNER_TEMP/qs-hex-sim.yml
+          nohup pixi run -e terminal python -m qs.runtime.main --config $RUNNER_TEMP/qs-hex-sim.yml \
+            > $RUNNER_TEMP/qs-hex.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -H "Authorization: ApiKey $QS_API_KEY" http://127.0.0.1:60610/api/status && break
+            sleep 5
+          done
+      - uses: astral-sh/setup-uv@v5
+      - name: Acceptance tests
+        working-directory: qs
+        env:
+          QS_HEX_SIM_URL: http://127.0.0.1:60610
+          HEX_SIM_DIR: ${{ github.workspace }}/hex-simulated-beamline
+        run: |
+          uv sync --extra dev
+          set -a; source ../hex-simulated-beamline/scripts/env.sh; set +a
+          uv run pytest -q -m acceptance tests/acceptance
+      - name: qs log
+        if: always()
+        run: tail -n 200 $RUNNER_TEMP/qs-hex.log || true
