@@ -26,5 +26,6 @@ with init_devices(mock=True):
 with init_devices(timeout=5):
     panda1 = HDFPanda("XF:27ID1-ES{PANDA:1}:", path_provider)
     kinetix1 = SimKinetixDetector(  # noqa: F821  (05-sim-kinetix.py)
-        "XF:27ID1-BI{Kinetix-Det:1}", ADWriterFactory.hdf(path_provider))
+        "XF:27ID1-BI{Kinetix-Det:1}", ADWriterFactory.hdf(path_provider)
+    )
     tomo_rot_axis = RotationMotor(_ROT_MOTOR)

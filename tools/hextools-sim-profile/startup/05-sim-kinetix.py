@@ -25,7 +25,9 @@ class SimKinetixDriverIO(_adkinetix.KinetixDriverIO):
 
 
 class SimKinetixDetector(_adkinetix.KinetixDetector):
-    def __init__(self, prefix: str, *writer_factories: ADWriterFactory, driver_suffix: str = "cam1:", name: str = ""):
+    def __init__(
+        self, prefix: str, *writer_factories: ADWriterFactory, driver_suffix: str = "cam1:", name: str = ""
+    ):
         driver = SimKinetixDriverIO(prefix + driver_suffix)
         AreaDetector.__init__(
             self,
