@@ -15,28 +15,27 @@ what that caller needs, not for everything ``EngineHost`` can do.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
 class EngineThreadHost(Protocol):
-    """Somewhere to run work on the engine thread, and the RunEngine it is driving.
+    """Two ways to get work onto the engine's threads, and no handle on the engine itself.
 
-    The device box needs exactly this much: construction of an ophyd device has to happen on
-    the thread that owns the engine (an ophyd-async device's ``connect()`` uses that thread's
-    event loop), and reaching the loop means reaching the engine.
+    The device box needs exactly this much: an ophyd device must be constructed on the thread
+    that owns the engine, and an ophyd-async device must then be connected on that engine's
+    event loop. Neither requires the RunEngine object, only somewhere to send the work.
 
-    Part of ``ifc:engine-commands``. Note that the interface's own wording says callers never
-    touch the RunEngine directly, which ``engine`` here does not honour — see
-    ``fact:engine-handle-escapes-the-command-channel``.
+    This is the shape ``ifc:engine-commands`` describes — "callers never touch the RunEngine
+    directly". Until 2026-09-11 the protocol also exposed ``engine``, and the device box used
+    it to reach the loop itself; :meth:`run_on_engine_loop` is what replaced that.
     """
-
-    @property
-    def engine(self) -> Any:
-        """The RunEngine being driven, or ``None`` before a profile has been loaded."""
-        ...
 
     def call(self, fn: Callable[[], Any], timeout: float | None = None) -> Any:
         """Run ``fn`` on the engine thread and return its result, raising what it raised."""
+        ...
+
+    def run_on_engine_loop(self, coro: Coroutine[Any, Any, Any], timeout: float | None = None) -> Any:
+        """Drive ``coro`` on the RunEngine's event loop and return its result."""
         ...

@@ -7,7 +7,6 @@ Definitions are data; instantiation runs on the engine thread so an ophyd-async 
 
 from __future__ import annotations
 
-import asyncio
 import importlib
 import inspect
 import logging
@@ -16,7 +15,7 @@ from typing import Any
 
 from qs.devices.models import DeviceDefinition
 from qs.devices.repository import DeviceDefinitionRepository
-from qs.engine import EngineThreadHost
+from qs.engine import EngineHostError, EngineThreadHost
 from qs.registry import Registry, RegistryError
 
 logger = logging.getLogger(__name__)
@@ -152,12 +151,9 @@ class DeviceDefinitionService:
         device = cls(definition.prefix, **kwargs) if definition.prefix else cls(**kwargs)
         connect = getattr(device, "connect", None)
         if callable(connect) and inspect.iscoroutinefunction(connect):
-            engine = self._host.engine
-            loop = getattr(engine, "loop", None)
-            if loop is None or not loop.is_running():
-                raise DeviceDefinitionError(
-                    "Cannot connect an ophyd-async device: the engine loop is not running"
-                )
-            fut = asyncio.run_coroutine_threadsafe(connect(), loop)
-            fut.result(timeout=self._connect_timeout)
+            # The engine box owns its loop; this box only says what it needs run on it.
+            try:
+                self._host.run_on_engine_loop(connect(), timeout=self._connect_timeout)
+            except EngineHostError as exc:
+                raise DeviceDefinitionError(f"Cannot connect an ophyd-async device: {exc}") from exc
         return device

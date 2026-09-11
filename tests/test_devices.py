@@ -27,15 +27,20 @@ from qs.sources import LoadResult
 
 
 class FakeEngineHost:
-    """All of ``EngineHost`` that the device service actually uses."""
+    """All of ``EngineHost`` that the device service actually uses — the whole box, in ten lines."""
 
     def __init__(self) -> None:
-        self.engine: Any = None
         self.calls: list[float | None] = []
+        self.coroutines: list[float | None] = []
 
     def call(self, fn, timeout: float | None = None):
         self.calls.append(timeout)
         return fn()
+
+    def run_on_engine_loop(self, coro, timeout: float | None = None):
+        self.coroutines.append(timeout)
+        coro.close()  # nothing drives it here; closing it keeps Python from warning
+        return None
 
 
 class Unbuildable:

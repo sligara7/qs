@@ -15,13 +15,14 @@ Threading model (accepted decisions ``dec:runengine-own-thread`` and
 
 from __future__ import annotations
 
+import asyncio
 import enum
 import logging
 import os
 import queue
 import threading
 import traceback
-from collections.abc import Callable, Generator, Mapping
+from collections.abc import Callable, Coroutine, Generator, Mapping
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -226,6 +227,39 @@ class EngineHost:
         except Exception as exc:  # noqa: BLE001 - RE.md may be a network-backed mapping
             return {"error": f"{type(exc).__name__}: {exc}"}
 
+    def engine_metadata(self) -> dict[str, Any]:
+        """The whole of the adopted engine's ``RE.md``, flattened for JSON.
+
+        Values that are not JSON scalars become their ``str()``, one level deep — the shape
+        ``/re/metadata`` has always returned. Compare :meth:`experiment_metadata`, which picks
+        out the sync-experiment keys and copies them recursively.
+        """
+        engine = self._engine
+        if engine is None:
+            return {}
+        md = dict(engine.md)
+        return {
+            k: (v if isinstance(v, (str, int, float, bool)) or v is None else str(v)) for k, v in md.items()
+        }
+
+    def open_runs(self) -> list[dict[str, Any]]:
+        """Runs the engine currently has open: start uid and scan_id where known.
+
+        Reads bluesky's run bundlers, which are private. That is why this lives here: the
+        engine box is the one place allowed to know bluesky's internals, so a rename upstream
+        breaks one method rather than an HTTP route.
+        """
+        engine = self._engine
+        if engine is None:
+            return []
+        out: list[dict[str, Any]] = []
+        for bundler in getattr(engine, "_run_bundlers", {}).values():  # noqa: SLF001
+            uid = getattr(bundler, "_run_start_uid", None)  # noqa: SLF001
+            md = getattr(bundler, "_md", None) or getattr(bundler, "md", None) or {}  # noqa: SLF001
+            scan_id = md.get("scan_id") if isinstance(md, dict) else None
+            out.append({"uid": uid, "is_open": True, "scan_id": scan_id})
+        return out
+
     def subscribers(self) -> dict[str, list[str]]:
         """Names of the callbacks subscribed to the engine, per document type (read-only).
 
@@ -265,6 +299,19 @@ class EngineHost:
     def call(self, fn: Callable[[], Any], timeout: float | None = None) -> Any:
         """Like :meth:`submit` but wait for the result."""
         return self.submit(fn).result(timeout)
+
+    def run_on_engine_loop(self, coro: Coroutine[Any, Any, Any], timeout: float | None = None) -> Any:
+        """Drive an awaitable on the RunEngine's own event loop, from any thread.
+
+        An ophyd-async device must be connected on the loop the engine owns. Callers hand the
+        coroutine here rather than reaching for the engine and its loop themselves, so that
+        knowledge stays inside this box (``ifc:engine-commands``).
+        """
+        engine = self._require_engine()
+        loop = getattr(engine, "loop", None)
+        if loop is None or not loop.is_running():
+            raise EngineHostError("The engine's event loop is not running")
+        return asyncio.run_coroutine_threadsafe(coro, loop).result(timeout)
 
     def load_source(self, source: ProfileSource, timeout: float | None = None) -> LoadResult:
         """Load ``source`` on the engine thread and adopt (or create) the RunEngine."""

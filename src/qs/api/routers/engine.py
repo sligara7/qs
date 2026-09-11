@@ -68,35 +68,13 @@ async def re_halt(services: Services = Depends(get_services)) -> dict[str, Any]:
 
 @router.get("/re/metadata", dependencies=[Depends(require_scope("read:status"))])
 async def re_metadata(services: Services = Depends(get_services)) -> dict[str, Any]:
-    engine = services.host.engine
-    md = dict(engine.md) if engine is not None else {}
-    return ok(
-        "",
-        metadata={
-            k: (v if isinstance(v, (str, int, float, bool)) or v is None else str(v)) for k, v in md.items()
-        },
-    )
-
-
-def _open_runs(services: Services) -> list[dict[str, Any]]:
-    """Open runs from the engine's run bundlers: start uid and scan_id when known."""
-    engine = services.host.engine
-    if engine is None:
-        return []
-    bundlers = getattr(engine, "_run_bundlers", {})  # noqa: SLF001
-    out: list[dict[str, Any]] = []
-    for bundler in bundlers.values():
-        uid = getattr(bundler, "_run_start_uid", None)  # noqa: SLF001
-        md = getattr(bundler, "_md", None) or getattr(bundler, "md", None) or {}  # noqa: SLF001
-        scan_id = md.get("scan_id") if isinstance(md, dict) else None
-        out.append({"uid": uid, "is_open": True, "scan_id": scan_id})
-    return out
+    return ok("", metadata=services.host.engine_metadata())
 
 
 def _run_list(services: Services, option: str) -> list[dict[str, Any]]:
     running = services.host.state in (EngineState.RUNNING, EngineState.PAUSED)
     if option in ("active", "open"):
-        return _open_runs(services) if running else []
+        return services.host.open_runs() if running else []
     outcome = services.host.last_outcome
     if outcome is None:
         return []
