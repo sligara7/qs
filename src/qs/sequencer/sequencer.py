@@ -20,8 +20,7 @@ from typing import Any
 
 from qs.engine import EngineHost, EngineHostError, EngineState, EventBus, EventKind, PlanOutcome
 from qs.errors import ErrorCode
-from qs.queue.models import HistoryEntry, ItemState, QueueItem
-from qs.queue.service import QueueError, QueueService
+from qs.queue import HistoryEntry, ItemState, QueueError, QueueItem, QueueService
 from qs.registry import Registry, RegistryError
 
 logger = logging.getLogger(__name__)

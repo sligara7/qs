@@ -12,7 +12,7 @@ import contextlib
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
-from qs.engine.events import EngineEvent, EventBus
+from qs.engine import EngineEvent, EventBus
 
 
 class EventBroadcaster:

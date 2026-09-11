@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Sequence
 
-from qs.queue.models import HistoryEntry, QueueItem
+from qs.queue import HistoryEntry, QueueItem
 
 
 class InMemoryQueueRepository:

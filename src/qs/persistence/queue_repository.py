@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from sqlalchemy import delete, func, select, update
 
 from qs.persistence.database import Database, HistoryRow, QueueItemRow
-from qs.queue.models import HistoryEntry, ItemState, QueueItem
+from qs.queue import HistoryEntry, ItemState, QueueItem
 
 
 def _row_to_item(row: QueueItemRow | HistoryRow) -> QueueItem:

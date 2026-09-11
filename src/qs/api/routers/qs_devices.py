@@ -15,8 +15,7 @@ from qs.api.deps import Services, get_services, require_scope
 from qs.api.describe import describe_device
 from qs.api.payload import read_payload
 from qs.api.responses import fail, fail_from, ok
-from qs.devices.models import DeviceDefinition
-from qs.devices.service import DeviceDefinitionError
+from qs.devices import DeviceDefinition, DeviceDefinitionError
 
 router = APIRouter(tags=["qs devices"])
 

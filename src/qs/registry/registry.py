@@ -13,7 +13,7 @@ from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from qs.sources.protocol import LoadResult, PlanFactory
+from qs.sources import LoadResult, PlanFactory
 
 
 class RegistryError(LookupError):

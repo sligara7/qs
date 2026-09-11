@@ -12,11 +12,10 @@ from qs.api.auth import Authenticator, Credential, Principal
 from qs.api.console import ConsoleCapture
 from qs.api.status import StatusReporter
 from qs.api.streams import EventBroadcaster
-from qs.devices.service import DeviceDefinitionService
-from qs.engine.events import EventBus
-from qs.engine.host import EngineHost
+from qs.devices import DeviceDefinitionService
+from qs.engine import EngineHost, EventBus
 from qs.errors import ErrorCode
-from qs.queue.service import QueueService
+from qs.queue import QueueService
 from qs.registry import Registry
 from qs.sequencer import Sequencer
 

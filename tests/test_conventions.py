@@ -82,3 +82,58 @@ def test_event_kinds_are_never_written_as_bare_strings() -> None:
                         if isinstance(lit, ast.Constant) and lit.value in values:
                             offenders.append(f"{path.relative_to(ROOT)}:{node.lineno} kind == {lit.value!r}")
     assert offenders == [], "use EventKind, not bare strings: " + "; ".join(offenders)
+
+
+def test_boxes_are_addressed_through_their_published_surface() -> None:
+    """One box reaches another only through its ``__init__``, never into its files.
+
+    Each package under ``src/qs`` is a black box: the docstring and ``__all__`` in its
+    ``__init__.py`` are its contract, and everything else inside it is free to move. That was
+    true by convention and nothing enforced it, so by 2026-09-11 there were 34 imports
+    reaching past a connector into a submodule and six symbols crossing a boundary while
+    appearing on no ``__all__`` at all — including five the composition root needed, so the
+    application could not be built from what the api box officially published.
+
+    TWO THINGS THIS RULE DELIBERATELY DOES NOT COVER.
+
+    Imports INSIDE a function are allowed. ``qs.runtime.compose.make_source`` defers importing
+    the BITS and happi sources so that installing qs does not drag in their dependencies
+    unless they are used; publishing those classes on ``qs.sources`` would force all three to
+    import eagerly and defeat it. A deferred import is a deliberate act with a cost, not a way
+    round this check.
+
+    Only ``src/qs`` is checked, not ``tests``. A test may reach inside the box it is testing —
+    that is what white-box testing is — and several reach for the concrete source classes that
+    are deliberately unpublished for the reason above.
+    """
+    import ast
+
+    packages = {p.parent.name for p in SRC.glob("*/__init__.py")}
+    offenders: list[str] = []
+    for path in SRC.rglob("*.py"):
+        relative = path.relative_to(SRC)
+        own_package = relative.parts[0] if len(relative.parts) > 1 else None
+        tree = ast.parse(path.read_text())
+
+        deferred = {
+            node
+            for parent in ast.walk(tree)
+            if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef))
+            for node in ast.walk(parent)
+            if isinstance(node, ast.ImportFrom)
+        }
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom) or node.module is None or node in deferred:
+                continue
+            parts = node.module.split(".")
+            if parts[0] != "qs" or len(parts) < 3:
+                continue  # not a qs import, or already the connector (qs.<package>)
+            target = parts[1]
+            if target not in packages or target == own_package:
+                continue  # a loose top-level module, or this box's own internals
+            names = ", ".join(alias.name for alias in node.names)
+            offenders.append(
+                f"{path.relative_to(ROOT)}:{node.lineno} imports {names} from {node.module}"
+                f" — use 'from qs.{target} import ...'"
+            )
+    assert offenders == [], "these reach past a box's published surface:\n  " + "\n  ".join(offenders)

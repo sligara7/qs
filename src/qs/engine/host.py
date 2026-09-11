@@ -31,7 +31,7 @@ from bluesky.run_engine import RunEngine, RunEngineInterrupted
 from qs.diagnostics import summarize
 from qs.engine.events import EventBus, EventKind
 from qs.engine.progress import ProgressWatcher
-from qs.sources.protocol import LoadResult, ProfileSource
+from qs.sources import LoadResult, ProfileSource
 
 logger = logging.getLogger(__name__)
 

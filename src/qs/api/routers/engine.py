@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Request
 from qs.api.deps import Services, get_services, require_scope
 from qs.api.payload import read_payload
 from qs.api.responses import fail, fail_from, ok
-from qs.engine.host import EngineHostError, EngineState
+from qs.engine import EngineHostError, EngineState
 from qs.errors import ErrorCode
 
 router = APIRouter(tags=["run engine"])

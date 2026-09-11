@@ -13,8 +13,8 @@ import json
 from typing import Any
 
 from qs import __version__
-from qs.engine.host import EngineHost, EngineState
-from qs.queue.service import QueueService
+from qs.engine import EngineHost, EngineState
+from qs.queue import QueueService
 from qs.registry import Registry
 from qs.sequencer import Sequencer
 

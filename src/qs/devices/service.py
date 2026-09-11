@@ -16,7 +16,7 @@ from typing import Any
 
 from qs.devices.models import DeviceDefinition
 from qs.devices.repository import DeviceDefinitionRepository
-from qs.engine.protocol import EngineThreadHost
+from qs.engine import EngineThreadHost
 from qs.registry import Registry, RegistryError
 
 logger = logging.getLogger(__name__)

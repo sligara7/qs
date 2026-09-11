@@ -11,8 +11,7 @@ from qs.api.deps import Services, get_principal, get_services, require_scope
 from qs.api.payload import read_payload
 from qs.api.responses import fail, fail_from, ok, unsupported
 from qs.errors import ErrorCode
-from qs.queue.models import QueueItem
-from qs.queue.service import QueueError
+from qs.queue import QueueError, QueueItem
 from qs.sequencer import SequencerError
 
 router = APIRouter(tags=["queue"])
