@@ -253,11 +253,20 @@ class EngineHost:
         Values that are not JSON scalars become their ``str()``, one level deep — the shape
         ``/re/metadata`` has always returned. Compare :meth:`experiment_metadata`, which picks
         out the sync-experiment keys and copies them recursively.
+
+        Reading ``RE.md`` can fail: at NSLS-II it is a Redis-backed mapping shared by every
+        process on the beamline, so this is a network operation. A failure is reported in the
+        payload rather than raised, for the same reason :meth:`experiment_metadata` does it —
+        a beamline-wide dependency having a bad moment should degrade one field of one
+        endpoint, not answer the operator with a blank server error.
         """
         engine = self._engine
         if engine is None:
             return {}
-        md = dict(engine.md)
+        try:
+            md = dict(engine.md)
+        except Exception as exc:  # noqa: BLE001 - RE.md may be a network-backed mapping
+            return {"error": f"{type(exc).__name__}: {exc}"}
         return {
             k: (v if isinstance(v, (str, int, float, bool)) or v is None else str(v)) for k, v in md.items()
         }

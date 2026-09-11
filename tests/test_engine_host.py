@@ -252,3 +252,55 @@ def test_registry_resolves_device_names_and_dotted_components(loaded: tuple[Engi
     gen = factory()
     assert hasattr(gen, "send")
     gen.close()
+
+
+# ---- reading the engine's metadata ----------------------------------------------------
+
+
+def test_engine_metadata_reports_a_failing_md_instead_of_raising(loaded: tuple[EngineHost, Registry]) -> None:
+    """At NSLS-II RE.md is Redis-backed and shared, so reading it is a network operation.
+
+    When it fails, /re/metadata must still answer and say why. Before 2026-09-11 the read was
+    unguarded and an unreachable Redis produced a bare 500.
+    """
+    host, _ = loaded
+
+    class Unreachable:
+        """A mapping that fails the way a network-backed RE.md fails.
+
+        Not a dict subclass: dict(x) copies one of those directly without asking it anything,
+        so a subclass could not reproduce the failure at all.
+        """
+
+        def keys(self):
+            raise ConnectionError("redis://beamline:6379 is unreachable")
+
+        def __getitem__(self, key):
+            raise ConnectionError("redis://beamline:6379 is unreachable")
+
+        def get(self, key, default=None):
+            raise ConnectionError("redis://beamline:6379 is unreachable")
+
+    original = host.engine.md
+    host.engine.md = Unreachable()
+    try:
+        assert host.engine_metadata() == {"error": "ConnectionError: redis://beamline:6379 is unreachable"}
+        assert host.experiment_metadata()["error"].startswith("ConnectionError"), (
+            "its sibling has always behaved this way; they must not diverge"
+        )
+    finally:
+        host.engine.md = original
+
+
+def test_engine_metadata_returns_what_the_profile_set(loaded: tuple[EngineHost, Registry]) -> None:
+    host, _ = loaded
+    host.engine.md["operator"] = "night shift"
+    try:
+        assert host.engine_metadata()["operator"] == "night shift"
+    finally:
+        del host.engine.md["operator"]
+
+
+def test_engine_metadata_is_empty_before_a_profile_is_loaded(host: EngineHost) -> None:
+    assert host.engine_metadata() == {}
+    assert host.open_runs() == []
