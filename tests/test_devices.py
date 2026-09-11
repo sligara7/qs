@@ -5,10 +5,11 @@ HTTP assertions in ``test_api.py``, from the far side of the API. These address 
 ``qs.devices`` publishes directly.
 
 Note what the engine fixture below demonstrates. ``DeviceDefinitionService`` needs exactly
-two things of an ``EngineHost`` — ``call()`` and ``engine`` — so the whole box can be tested
-without starting a thread or a RunEngine. That is the concrete argument for an ``EngineHost``
-protocol under ``dec:open-inside-the-box-discipline``; the fake here is doing a protocol's
-job without one existing.
+two things of an engine host — ``call()`` and ``engine`` — so the whole box can be tested
+without starting a thread or a RunEngine. Since 2026-09-11 that seam is declared:
+:class:`qs.engine.EngineThreadHost`, which both the real ``EngineHost`` and the fake below
+satisfy, so replacing the engine box here is the contract working rather than duck-typing
+that happens to hold.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ import pytest
 from ophyd.sim import SynAxis
 
 from qs.devices import DeviceDefinition, DeviceDefinitionError, DeviceDefinitionService
+from qs.engine import EngineHost, EngineThreadHost, EventBus
 from qs.persistence import InMemoryDeviceDefinitionRepository
 from qs.registry import Registry
 from qs.sources import LoadResult
@@ -39,6 +41,17 @@ class FakeEngineHost:
 class Unbuildable:
     def __init__(self, **kwargs: Any) -> None:
         raise RuntimeError("this device always fails to construct")
+
+
+def test_the_real_host_and_the_fake_both_satisfy_the_declared_seam() -> None:
+    """The point of the protocol: what the device box asks for, both can supply.
+
+    Checking the REAL EngineHost too is the half that matters. A protocol only the fake
+    satisfies would let this whole test module pass while the service could not be wired to
+    the thing it runs against in production.
+    """
+    assert isinstance(FakeEngineHost(), EngineThreadHost)
+    assert isinstance(EngineHost(events=EventBus()), EngineThreadHost)
 
 
 @pytest.fixture

@@ -16,7 +16,7 @@ from typing import Any
 
 from qs.devices.models import DeviceDefinition
 from qs.devices.repository import DeviceDefinitionRepository
-from qs.engine.host import EngineHost
+from qs.engine.protocol import EngineThreadHost
 from qs.registry import Registry, RegistryError
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class DeviceDefinitionService:
         *,
         repository: DeviceDefinitionRepository,
         registry: Registry,
-        host: EngineHost,
+        host: EngineThreadHost,
         on_change: Callable[[], None] | None = None,
         connect_timeout: float = 10.0,
     ) -> None:

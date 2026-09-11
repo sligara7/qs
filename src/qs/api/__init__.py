@@ -6,6 +6,18 @@ Thin by design: every route translates HTTP into calls on the services it receiv
 """
 
 from qs.api.app import create_app
+from qs.api.auth import Authenticator, SingleKeyAuthenticator
+from qs.api.console import ConsoleCapture
 from qs.api.deps import Services
+from qs.api.status import StatusReporter
+from qs.api.streams import EventBroadcaster
 
-__all__ = ["Services", "create_app"]
+__all__ = [
+    "Authenticator",
+    "ConsoleCapture",
+    "EventBroadcaster",
+    "Services",
+    "SingleKeyAuthenticator",
+    "StatusReporter",
+    "create_app",
+]

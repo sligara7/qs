@@ -4,6 +4,6 @@ Every source implements :class:`qs.sources.protocol.ProfileSource` and returns a
 :class:`qs.sources.protocol.LoadResult`. Loading always happens on the engine thread.
 """
 
-from qs.sources.protocol import LoadResult, ProfileSource
+from qs.sources.protocol import LoadResult, PlanFactory, ProfileSource
 
-__all__ = ["LoadResult", "ProfileSource"]
+__all__ = ["LoadResult", "PlanFactory", "ProfileSource"]

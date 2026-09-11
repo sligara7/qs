@@ -8,6 +8,7 @@ or created). Everything else in the service talks to it through
 
 from qs.engine.events import STATUS_CHANGE_KINDS, EngineEvent, EventBus, EventKind
 from qs.engine.host import EngineHost, EngineHostError, EngineState, PlanOutcome
+from qs.engine.protocol import EngineThreadHost
 
 __all__ = [
     "STATUS_CHANGE_KINDS",
@@ -15,6 +16,7 @@ __all__ = [
     "EngineHost",
     "EngineHostError",
     "EngineState",
+    "EngineThreadHost",
     "EventBus",
     "EventKind",
     "PlanOutcome",
