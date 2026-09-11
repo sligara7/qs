@@ -4,6 +4,14 @@ Every fault qs reports carries one of these codes in its log headline, in ``qs.l
 in HTTP failure bodies (``code``). ``docs/errors.md`` is generated from this table
 (``python -m qs.errors > docs/errors.md``) so the documentation and the code cannot drift; a
 test checks they match. Decided 2026-09-04 (dec:open-logging-and-errors).
+
+DELIBERATELY CROSS-CUTTING. This module belongs to none of the ten boxes: it sits loose at the top of
+``src/qs`` and is imported by the api, engine, sequencer, runtime and cli boxes. That is on purpose and was
+weighed on 2026-09-11 (``dec:open-inside-the-box-discipline``). Promoting it to an eleventh package would
+mean revising ``dec:proposed-structure`` and would change nothing about behaviour; pushing pieces of it into
+the boxes that use them would recreate the duplication it exists to prevent. The published-surface rule in
+``tests/test_conventions.py`` permits this by construction — it polices imports between PACKAGES, so a top-
+level module is open to all of them.
 """
 
 from __future__ import annotations

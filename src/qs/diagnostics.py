@@ -3,6 +3,14 @@
 Decided 2026-09-04 (dec:open-logging-and-errors): every fault logs ONE headline naming the layer,
 the item, the root cause and what qs did; the deepest frame in profile code is named beside the
 exception; tracebacks appear only at DEBUG (and in the item's history entry over HTTP).
+
+DELIBERATELY CROSS-CUTTING. This module belongs to none of the ten boxes: it sits loose at the top of
+``src/qs`` and is imported by the engine, sequencer and runtime boxes. That is on purpose and was weighed on
+2026-09-11 (``dec:open-inside-the-box-discipline``). Promoting it to an eleventh package would mean revising
+``dec:proposed-structure`` and would change nothing about behaviour; pushing pieces of it into the boxes
+that use them would recreate the duplication it exists to prevent. The published-surface rule in
+``tests/test_conventions.py`` permits this by construction — it polices imports between PACKAGES, so a top-
+level module is open to all of them.
 """
 
 from __future__ import annotations

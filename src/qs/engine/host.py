@@ -154,7 +154,14 @@ class EngineHost:
         self._last_outcome: PlanOutcome | None = None
         self._last_error: str | None = None
 
-    # ---- lifecycle -----------------------------------------------------------------
+    # ================================================================================
+    # cap:engine-isolation — the dedicated thread, and faults contained on it
+    #
+    # One thread owns the RunEngine for its whole life. Everything that touches the engine
+    # directly is funnelled onto it through the command queue below, so a fault raised in the
+    # HTTP, persistence or registry layers is reported over the API and never reaches a running
+    # plan. See also _run_loop, which turns every exception into a Future's result.
+    # ================================================================================
 
     def start(self) -> None:
         if self._thread is not None:
@@ -178,7 +185,20 @@ class EngineHost:
     def on_engine_thread(self) -> bool:
         return threading.current_thread() is self._thread
 
-    # ---- observation ---------------------------------------------------------------
+    # ================================================================================
+    # Read-only views of the engine
+    #
+    # Two capabilities and one region the design attributes to neither.
+    #   cap:experiment-visibility — EXPERIMENT_KEYS and experiment_metadata(), which read the
+    #     sync-experiment keys a beamline writes into a shared RE.md. Read off the engine
+    #     thread on purpose, so a running plan cannot block a status request.
+    #   cap:adopt-engine — engine_adopted and load_result report the outcome of the adoption
+    #     performed below in _load_source_on_thread.
+    #   Unattributed: state, current_item_uid, last_outcome, last_error, re_state,
+    #     engine_metadata(), open_runs() and subscribers() carry no REALIZES edge of their own;
+    #     they feed cap:runengine-fault-api and the status document, which the design attributes
+    #     to src/qs/api/status.py rather than here.
+    # ================================================================================
 
     @property
     def state(self) -> EngineState:
@@ -286,7 +306,13 @@ class EngineHost:
         """bluesky's own state string, or ``None`` before an engine exists."""
         return None if self._engine is None else str(self._engine.state)
 
-    # ---- command channel (ifc:engine-commands) -------------------------------------
+    # ================================================================================
+    # ifc:engine-commands — the only way in
+    #
+    # submit/call put work on the engine thread; run_on_engine_loop puts it on the RunEngine's
+    # event loop; load_source and run_plan are the two things the rest of the service asks for.
+    # No caller holds the RunEngine itself, which is what the interface promises.
+    # ================================================================================
 
     def submit(self, fn: Callable[[], Any]) -> Future[Any]:
         """Run ``fn`` on the engine thread; the future carries its result or exception."""
@@ -334,7 +360,13 @@ class EngineHost:
             raise EngineHostError(f"Engine is {self.state.value}; cannot start a plan")
         return self.submit(lambda: self._run_plan_on_thread(plan_factory, item_uid, metadata or {}))
 
-    # ---- control (thread-safe; callable from any thread) ---------------------------
+    # ================================================================================
+    # ifc:engine-commands, continued — interrupts that must not queue behind a plan
+    #
+    # bluesky makes request_pause/abort/stop/halt thread-safe, so these are called from the
+    # caller's thread rather than the engine thread. That is the point: the engine thread is
+    # busy running the plan you are trying to interrupt.
+    # ================================================================================
 
     def request_pause(self, *, defer: bool = False) -> None:
         engine = self._require_engine()
@@ -372,7 +404,20 @@ class EngineHost:
             return
         raise EngineHostError(f"Engine is {self.state.value}; nothing to {kind}")
 
-    # ---- engine-thread internals ---------------------------------------------------
+    # ================================================================================
+    # cap:adopt-engine and cap:qserver-env — what happens on the engine thread
+    #
+    #   cap:adopt-engine — _load_source_on_thread takes the RunEngine the profile created, or
+    #     builds one when it made none, and _install_engine binds it: exactly one engine per
+    #     service, with the profile's own subscriptions left alone
+    #     (dec:no-service-document-consumers).
+    #   cap:qserver-env — _load_source_on_thread sets _QSERVER_RE_WORKER_ACTIVE before the
+    #     profile runs, so a profile asking is_re_worker_active() gets the same answer it would
+    #     under the bluesky-queueserver worker.
+    #   The rest — _run_plan_on_thread, _handle_pause, the directive handshake and the outcome
+    #     builders — is plan execution, which the design attributes to cap:queue-execution on
+    #     the sequencer rather than to this file.
+    # ================================================================================
 
     def _run_loop(self) -> None:
         while True:
