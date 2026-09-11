@@ -16,7 +16,7 @@ from __future__ import annotations
 import importlib
 import logging
 
-from qs.sources.ipython_profile import find_engine, iter_devices, iter_plans
+from qs.sources.namespace import iter_devices, load_result
 from qs.sources.protocol import LoadResult
 
 logger = logging.getLogger(__name__)
@@ -45,19 +45,9 @@ class BitsInstrumentSource:
                     devices.setdefault(getattr(dev, "name", None) or str(dev), dev)
             except Exception:  # noqa: BLE001 - registry shape varies between versions
                 logger.debug("Could not enumerate oregistry devices", exc_info=True)
-        plans = dict(iter_plans(namespace))
-        engine = find_engine(namespace)
-        logger.info(
-            "Loaded BITS instrument %s: %d devices, %d plans, engine %s",
-            self._module_name,
-            len(devices),
-            len(plans),
-            "adopted" if engine is not None else "not defined",
-        )
-        return LoadResult(
-            devices=devices,
-            plans=plans,
-            engine=engine,
-            namespace=namespace,
+        return load_result(
+            namespace,
+            label=f"BITS instrument {self._module_name}",
             source_description=self.description,
+            devices=devices,
         )

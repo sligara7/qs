@@ -16,7 +16,7 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
-from qs.sources.ipython_profile import iter_plans
+from qs.sources.namespace import iter_plans
 from qs.sources.protocol import LoadResult, PlanFactory
 
 logger = logging.getLogger(__name__)
