@@ -141,7 +141,13 @@ def build_application(
         events=events,
         require_synced_experiment=config.engine.require_synced_experiment,
     )
-    status = StatusReporter(host=host, queue=queue, sequencer=sequencer, registry=registry)
+    status = StatusReporter(
+        host=host,
+        queue=queue,
+        sequencer=sequencer,
+        registry=registry,
+        stall_after=config.engine.stall_after,
+    )
 
     devices = DeviceDefinitionService(
         repository=SqlDeviceDefinitionRepository(database),

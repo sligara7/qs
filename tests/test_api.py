@@ -423,3 +423,98 @@ def test_status_shows_the_synced_experiment(client: TestClient, application: App
     assert qs_section["experiment"]["proposal"] == {"pi_name": "A. Sligar"}  # serialised as a plain dict
     assert qs_section["require_synced_experiment"] is False
     host.call(lambda: [host.engine.md.pop(k, None) for k in ("data_session", "cycle", "proposal")])
+
+
+# ---- the stall alarm: it says so, it never acts ----------------------------------------
+
+
+def _reporter(host, *, stall_after: float, now):
+    from qs.api.status import StatusReporter
+    from qs.persistence import InMemoryQueueRepository
+    from qs.queue import QueueService
+    from qs.registry import Registry
+    from qs.sequencer import Sequencer
+
+    registry = Registry()
+    queue = QueueService(InMemoryQueueRepository(), registry)
+    sequencer = Sequencer(queue=queue, registry=registry, host=host, events=host._events)  # noqa: SLF001
+    return StatusReporter(
+        host=host,
+        queue=queue,
+        sequencer=sequencer,
+        registry=registry,
+        stall_after=stall_after,
+        clock=now,
+    )
+
+
+class _FakeHost:
+    """Only what StatusReporter reads of a host, so the clock is the thing under test."""
+
+    def __init__(self) -> None:
+        from qs.engine import EngineState, EventBus
+
+        self._events = EventBus()
+        self.state = EngineState.RUNNING
+        self._total = 0
+
+    def collected_events(self):
+        return {"runs": [], "total": self._total}
+
+    def collect(self, n: int = 1) -> None:
+        self._total += n
+
+
+def test_a_running_plan_that_collects_nothing_is_called_stalled(caplog) -> None:
+    """req:stalled-plan-is-noticed. The alarm says so; nothing is aborted."""
+    import logging
+
+    clock = [1000.0]
+    host = _FakeHost()
+    reporter = _reporter(host, stall_after=60.0, now=lambda: clock[0])
+
+    assert reporter._progress_and_stall()["plan_stalled"] is False  # noqa: SLF001
+    clock[0] += 59
+    assert reporter._progress_and_stall()["plan_stalled"] is False, "59 s is not yet a stall"  # noqa: SLF001
+    clock[0] += 2
+    with caplog.at_level(logging.WARNING, logger="qs.api.status"):
+        progress = reporter._progress_and_stall()  # noqa: SLF001
+    assert progress["plan_stalled"] is True
+    assert progress["seconds_since_progress"] >= 60
+    assert any("not stopping it" in r.getMessage() for r in caplog.records), (
+        "the log line must say qs is not acting, so nobody waits for it to"
+    )
+
+
+def test_the_alarm_clears_and_re_arms_when_data_starts_arriving_again(caplog) -> None:
+    import logging
+
+    clock = [1000.0]
+    host = _FakeHost()
+    reporter = _reporter(host, stall_after=60.0, now=lambda: clock[0])
+    clock[0] += 61
+    assert reporter._progress_and_stall()["plan_stalled"] is True  # noqa: SLF001
+
+    host.collect()
+    assert reporter._progress_and_stall()["plan_stalled"] is False  # noqa: SLF001
+    clock[0] += 61
+    caplog.clear()  # count only the SECOND episode's lines
+    with caplog.at_level(logging.WARNING, logger="qs.api.status"):
+        for _ in range(4):  # a websocket rebuilds status about once a second
+            assert reporter._progress_and_stall()["plan_stalled"] is True  # noqa: SLF001
+    lines = [r for r in caplog.records if "not stopping it" in r.getMessage()]
+    assert len(lines) == 1, "one line per stall episode, not one per status poll"
+
+
+def test_an_idle_engine_is_never_stalled() -> None:
+    """A queue with nothing running has not stopped making progress; it has nothing to make."""
+    from qs.engine import EngineState
+
+    clock = [1000.0]
+    host = _FakeHost()
+    host.state = EngineState.IDLE
+    reporter = _reporter(host, stall_after=1.0, now=lambda: clock[0])
+    clock[0] += 3600
+    progress = reporter._progress_and_stall()  # noqa: SLF001
+    assert progress["plan_stalled"] is False
+    assert progress["seconds_since_progress"] is None

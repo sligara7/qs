@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import time
+from collections.abc import Callable
 from typing import Any
 
 from qs import __version__
@@ -18,6 +21,8 @@ from qs.queue import QueueService
 from qs.registry import Registry
 from qs.sequencer import Sequencer
 
+logger = logging.getLogger(__name__)
+
 
 def _uid_of(*parts: Any) -> str:
     return hashlib.sha1(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()[:32]
@@ -25,7 +30,14 @@ def _uid_of(*parts: Any) -> str:
 
 class StatusReporter:
     def __init__(
-        self, *, host: EngineHost, queue: QueueService, sequencer: Sequencer, registry: Registry
+        self,
+        *,
+        host: EngineHost,
+        queue: QueueService,
+        sequencer: Sequencer,
+        registry: Registry,
+        stall_after: float = 300.0,
+        clock: Callable[[], float] = time.time,
     ) -> None:
         self._host = host
         self._queue = queue
@@ -35,6 +47,52 @@ class StatusReporter:
         self._registry_revision = 0
         self._last_counts = (0, 0)  # (items_in_queue, items_in_history) when the database last answered
         self._database_error: str | None = None
+        self._stall_after = stall_after
+        self._clock = clock
+        self._last_progress_at = clock()
+        self._last_collected = 0
+        self._stall_announced = False
+
+    def _progress_and_stall(self) -> dict[str, Any]:
+        """How far the running plan has got, and whether it has stopped getting anywhere.
+
+        qs NEVER aborts a plan on a timer (``dec:open-a-plan-that-never-returns``). An overnight
+        series or a tomography flyscan is legitimately hours long, and beamtime killed by a
+        default cannot be recovered. This only says so: an alarm that cannot act.
+
+        The stall test is "the collected-event count has not moved for ``stall_after`` seconds
+        while a plan is running". It is derived here rather than on a timer because the
+        sequencer's thread is parked inside the running plan and has no tick to spare.
+
+        ⚠️ THE LIMIT THAT MATTERS FOR LATER: this is computed when somebody asks for status, so
+        it notices only while something is watching — which is true today (the user, 2026-09-11:
+        "for now, somebody will watch it") because an open websocket rebuilds this about once a
+        second. When qs is to run unwatched, this needs a tick of its own to sit on, and the
+        notification channel that would consume it. Nothing here has to be undone for that.
+        """
+        collected = self._host.collected_events()
+        total = int(collected["total"])
+        now = self._clock()
+        running = self._host.state is EngineState.RUNNING
+        if total != self._last_collected or not running:
+            self._last_collected = total
+            self._last_progress_at = now
+            self._stall_announced = False
+        quiet_for = now - self._last_progress_at
+        stalled = running and quiet_for >= self._stall_after
+        if stalled and not self._stall_announced:
+            self._stall_announced = True
+            logger.warning(
+                "[engine] no data collected for %.0f s while a plan is running; qs is not "
+                "stopping it. Check the devices it is waiting on, or abort if it is wedged.",
+                quiet_for,
+            )
+        return {
+            "collected_events": total,
+            "runs_in_progress": collected["runs"],
+            "seconds_since_progress": round(quiet_for, 1) if running else None,
+            "plan_stalled": stalled,
+        }
 
     def bump_registry(self) -> None:
         self._registry_revision += 1
@@ -108,6 +166,10 @@ class StatusReporter:
                 "database_ok": self._database_error is None and seq.database_error is None,
                 "database_error": self._database_error or seq.database_error,
                 "pending_history": len(pending),
+                # Plan-level progress and the stall alarm. Inside the qs namespace, not beside
+                # it: bluesky-queueserver has no equivalent, and one qs-owned key is easier to
+                # keep honest than two.
+                "progress": self._progress_and_stall(),
                 "require_synced_experiment": seq.require_synced_experiment,
             },
         }

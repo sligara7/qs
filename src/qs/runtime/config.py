@@ -10,7 +10,8 @@ Honoured environment variables (same meaning as in the predecessors):
   ``QSERVER_HTTP_SERVER_ALLOW_ORIGINS``, ``QSERVER_HTTP_SERVER_RESPONSE_BYTESIZE_LIMIT``.
 
 qs-specific variables: ``QS_STARTUP_DIR``, ``QS_STARTUP_MODULE``, ``QS_DATABASE_URL``,
-``QS_HTTP_HOST``, ``QS_HTTP_PORT``, ``QS_STREAM_DEVICE_PROGRESS``, ``QS_REQUIRE_SYNCED_EXPERIMENT``.
+``QS_HTTP_HOST``, ``QS_HTTP_PORT``, ``QS_STREAM_DEVICE_PROGRESS``, ``QS_REQUIRE_SYNCED_EXPERIMENT``,
+``QS_STALL_AFTER``.
 
 Not applicable, by design: ``QSERVER_ZMQ_*`` (HTTP only), ``QSERVER_EMERGENCY_LOCK_KEY_FOR_SERVER``
 (the queue is the lock), ``QSERVER_USE_IPYTHON_KERNEL`` and ``QSERVER_IPYTHON_KERNEL_*`` (no kernel).
@@ -68,6 +69,10 @@ class EngineConfig:
     progress_min_update_period: float = 0.2
     permitted_re_metadata_keys: list[str] = field(default_factory=lambda: ["/"])
     capture_console: bool = True
+    # Seconds a running plan may collect nothing before status says it has stalled. qs never
+    # acts on this — it only says so (dec:open-a-plan-that-never-returns). Generous by default:
+    # a slow detector or a long move is not a stall, and crying wolf is how an alarm gets ignored.
+    stall_after: float = 300.0
     # Refuse queue_start/autostart while the profile's RE.md has no synced experiment
     # (nslsii sync-experiment writes data_session/cycle/proposal into the shared Redis RE.md).
     require_synced_experiment: bool = False
@@ -142,6 +147,8 @@ def _apply_environment(config: Config, env: Mapping[str, str]) -> None:
         config.http.port = int(env["QS_HTTP_PORT"])
     if "QS_STREAM_DEVICE_PROGRESS" in env:
         config.engine.stream_device_progress = _truthy(env["QS_STREAM_DEVICE_PROGRESS"])
+    if env.get("QS_STALL_AFTER"):
+        config.engine.stall_after = float(env["QS_STALL_AFTER"])
     config.ignored_environment = sorted(
         k for k in env if k.startswith(NOT_APPLICABLE_PREFIXES) or k in NOT_APPLICABLE_VARS
     )
