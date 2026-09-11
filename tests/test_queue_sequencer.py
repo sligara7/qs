@@ -6,13 +6,16 @@ import time
 from collections.abc import Iterator
 from pathlib import Path
 
+import bluesky.plans as bp
 import pytest
+from ophyd.sim import SynAxis
 
 from qs.engine import EngineHost, EngineState, EventBus
 from qs.persistence import Database, InMemoryQueueRepository, SqlQueueRepository
 from qs.queue import ItemState, QueueError, QueueItem, QueueService
 from qs.registry import Registry
 from qs.sequencer import Sequencer, SequencerError
+from qs.sources import LoadResult
 from qs.sources.ipython_profile import IPythonProfileSource
 
 PROFILE = Path(__file__).parent / "profiles" / "minimal" / "startup"
@@ -338,3 +341,71 @@ def test_database_unreachable_after_plan_holds_history_and_stops_queue(tmp_path:
         seq.close()
     finally:
         host.shutdown()
+
+
+# ---- parameters are bound to the plan before an item is accepted -----------------------
+
+
+def _queue_service() -> QueueService:
+    registry = Registry()
+    registry.load_from(
+        LoadResult(devices={"det": SynAxis(name="det")}, plans={"count": bp.count, "scan": bp.scan})
+    )
+    return QueueService(InMemoryQueueRepository(), registry)
+
+
+@pytest.mark.parametrize(
+    ("args", "kwargs", "because"),
+    [
+        ([], {}, "missing a required argument"),  # bp.count needs detectors
+        ([["det"], 1, 0.0, "extra"], {}, "too many positional arguments"),
+        ([["det"]], {"nmu": 3}, "unexpected keyword argument"),  # 'num' misspelled
+    ],
+)
+def test_an_item_that_cannot_call_its_plan_is_refused_at_submit(args, kwargs, because) -> None:
+    """req:queue-item-parameters-checked-at-submit, the mistakes that actually reach a queue."""
+    service = _queue_service()
+    with pytest.raises(QueueError, match="does not fit plan 'count'"):
+        service.add(QueueItem(name="count", args=args, kwargs=kwargs))
+    assert len(service) == 0, "a refused item must not be left on the queue"
+
+
+def test_the_refusal_names_the_plan_and_repeats_pythons_reason() -> None:
+    """An operator has to be able to act on this without reading the plan's source."""
+    service = _queue_service()
+    with pytest.raises(QueueError) as caught:
+        service.add(QueueItem(name="count", args=[["det"]], kwargs={"nmu": 3}))
+    assert "count" in str(caught.value)
+    assert "nmu" in str(caught.value), "say which keyword was wrong, not just that one was"
+
+
+def test_a_batch_is_refused_whole_when_one_item_does_not_fit() -> None:
+    """add_batch validates every item before adding any, as httpserver does."""
+    service = _queue_service()
+    good = QueueItem(name="count", args=[["det"]])
+    with pytest.raises(QueueError, match="does not fit plan"):
+        service.add_batch([good, QueueItem(name="count")])
+    assert len(service) == 0, "the good item must not survive a refused batch"
+
+
+def test_device_names_are_not_judged_here() -> None:
+    """Values are the Registry's business at run time; this checks only that the call is possible."""
+    service = _queue_service()
+    service.add(QueueItem(name="count", args=[["no_such_device"]]))
+    assert len(service) == 1
+
+
+def test_a_plan_taking_star_args_accepts_anything() -> None:
+    """bp.scan has *args, so binding cannot refuse it — and must not pretend otherwise."""
+    service = _queue_service()
+    service.add(QueueItem(name="scan", args=[["det"], "det", -1, 1, 11]))
+    assert len(service) == 1
+
+
+def test_a_plan_that_cannot_be_introspected_is_still_accepted() -> None:
+    """Some callables have no signature. Execution is then the only place that can know."""
+    registry = Registry()
+    registry.load_from(LoadResult(devices={}, plans={"opaque": print}))
+    service = QueueService(InMemoryQueueRepository(), registry)
+    service.add(QueueItem(name="opaque", args=["anything", "at", "all"]))
+    assert len(service) == 1

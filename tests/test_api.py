@@ -154,7 +154,15 @@ def test_queue_add_get_move_remove(client: TestClient) -> None:
     bad = client.post("/api/queue/item/add", json={"item": {"name": "no_such_plan"}}).json()
     assert bad["success"] is False and "Unknown plan" in bad["msg"]
     batch = client.post(
-        "/api/queue/item/add/batch", json={"items": [{"name": "count", "args": [["det"]]}, {"name": "count"}]}
+        "/api/queue/item/add/batch",
+        json={
+            "items": [
+                {"name": "count", "args": [["det"]]},
+                # Was {"name": "count"} until 2026-09-11, which bp.count cannot run — it requires
+                # detectors. qs accepted it then and failed at execution; it is refused now.
+                {"name": "count", "args": [["det"]], "kwargs": {"num": 3}},
+            ]
+        },
     ).json()
     assert batch["success"] and batch["qsize"] == 3
     uids = [i["item_uid"] for i in batch["items"]]

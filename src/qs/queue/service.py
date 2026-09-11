@@ -7,6 +7,7 @@ forms, clear, get, and history. Queue start/stop/autostart state belongs to the 
 
 from __future__ import annotations
 
+import inspect
 import threading
 from collections.abc import Sequence
 from typing import Any
@@ -14,6 +15,7 @@ from typing import Any
 from qs.queue.models import HistoryEntry, QueueItem
 from qs.queue.repository import QueueRepository
 from qs.registry import Registry, RegistryError
+from qs.sources import PlanFactory
 
 
 class QueueError(ValueError):
@@ -56,11 +58,38 @@ class QueueService:
                 f"Unsupported item type {item.item_type!r}: this service runs Bluesky plans only"
             )
         try:
-            self._registry.get_plan(item.name)
+            plan = self._registry.get_plan(item.name)
         except RegistryError as exc:
             raise QueueError(str(exc)) from exc
         if not isinstance(item.args, list) or not isinstance(item.kwargs, dict):
             raise QueueError("Item 'args' must be a list and 'kwargs' a dict")
+        self._check_parameters(plan, item)
+
+    @staticmethod
+    def _check_parameters(plan: PlanFactory, item: QueueItem) -> None:
+        """Can these args and kwargs actually call this plan?
+
+        Bound, not type-checked. A real profile is full of plans carrying no annotations —
+        bluesky's own ``bp.scan`` among them — so binding is the check that degrades
+        gracefully, and it still catches what actually reaches a queue: the wrong number of
+        arguments, a misspelled keyword, a required parameter nobody supplied.
+
+        Values are not inspected, deliberately. A device is named by a string here and becomes
+        an object only when the Registry resolves it at run time, so this cannot and should not
+        judge whether ``"motor"`` is a real device — the Registry does that, and its refusal is
+        already a QueueError too.
+
+        Without this the mistake was found at execution instead, where req:failure-stop-and-wait
+        correctly stops the whole queue: a typo became a stopped beamline hours later.
+        """
+        try:
+            signature = inspect.signature(plan)
+        except (TypeError, ValueError):
+            return  # not introspectable; execution is then the only place that can know
+        try:
+            signature.bind(*item.args, **item.kwargs)
+        except TypeError as exc:
+            raise QueueError(f"Item does not fit plan {item.name!r}: {exc}") from exc
 
     # ---- mutation ------------------------------------------------------------------
 
