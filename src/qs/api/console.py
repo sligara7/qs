@@ -26,7 +26,7 @@ class _Tee(io.TextIOBase):
         self._original = original
         self._sink = sink
 
-    def write(self, text: str) -> int:  # type: ignore[override]
+    def write(self, text: str) -> int:
         try:
             self._original.write(text)
         except Exception:  # noqa: BLE001
@@ -62,8 +62,8 @@ class ConsoleCapture:
         if self._installed:
             return
         self._saved = (sys.stdout, sys.stderr)
-        sys.stdout = _Tee(sys.stdout, self)  # type: ignore[assignment]
-        sys.stderr = _Tee(sys.stderr, self)  # type: ignore[assignment]
+        sys.stdout = _Tee(sys.stdout, self)
+        sys.stderr = _Tee(sys.stderr, self)
         self._installed = True
 
     def uninstall(self) -> None:

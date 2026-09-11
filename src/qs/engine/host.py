@@ -24,9 +24,10 @@ import traceback
 from collections.abc import Callable, Generator, Mapping
 from concurrent.futures import Future
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
-from bluesky.run_engine import RunEngine, RunEngineInterrupted
+# bluesky re-exports RunEngineInterrupted without an explicit __all__ entry.
+from bluesky.run_engine import RunEngine, RunEngineInterrupted  # type: ignore[attr-defined]
 
 from qs.diagnostics import summarize
 from qs.engine.events import EventBus, EventKind
@@ -105,7 +106,7 @@ def _callback_name(cb: Any) -> str:
         return type(func).__name__ if func is not None else type(cb).__name__
     if hasattr(cb, "__self__"):
         return f"{type(cb.__self__).__name__}.{cb.__name__}"
-    name = getattr(cb, "__name__", None)
+    name: str | None = getattr(cb, "__name__", None)
     if name and name != "<lambda>":
         return name
     return type(cb).__name__ if name is None else f"{type(cb).__name__}:<lambda>"
@@ -267,7 +268,7 @@ class EngineHost:
 
     def load_source(self, source: ProfileSource, timeout: float | None = None) -> LoadResult:
         """Load ``source`` on the engine thread and adopt (or create) the RunEngine."""
-        return self.call(lambda: self._load_source_on_thread(source), timeout)
+        return cast("LoadResult", self.call(lambda: self._load_source_on_thread(source), timeout))
 
     def run_plan(
         self,
@@ -380,14 +381,15 @@ class EngineHost:
             logger.info("[engine] %s -> %s", old_state, new_state)
             self._events.emit(EventKind.RE_STATE, state=str(new_state), previous=str(old_state))
 
-        engine.state_hook = state_hook
+        # bluesky annotates state_hook/waiting_hook as None, so a real hook reads as a type error.
+        engine.state_hook = state_hook  # type: ignore[assignment]
         if self._progress_enabled:
             watcher = ProgressWatcher(
                 self._events,
                 min_update_period=self._progress_min_update_period,
                 chained_hook=engine.waiting_hook,
             )
-            engine.waiting_hook = watcher
+            engine.waiting_hook = watcher  # type: ignore[assignment]
             self._progress = watcher
         self._set_state(EngineState.IDLE)
 

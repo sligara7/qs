@@ -13,6 +13,7 @@ import sysconfig
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TextIO
 
 _QS_PACKAGE_DIR = str(Path(__file__).resolve().parent)
 _LIBRARY_DIRS = tuple(
@@ -76,7 +77,7 @@ def _chain(exc: BaseException) -> list[BaseException]:
         seen.add(id(current))
         chain.append(current)
         current = None
-    outer = exc
+    outer: BaseException | None = exc
     while outer is not None and id(outer) not in seen:
         seen.add(id(outer))
         chain.append(outer)
@@ -137,7 +138,7 @@ class TracebackPolicy(logging.Filter):
         return True
 
 
-def configure_logging(level: str = "INFO", stream=None) -> None:  # noqa: ANN001
+def configure_logging(level: str = "INFO", stream: TextIO | None = None) -> None:
     """Journald-friendly logging: one line per record, tracebacks only at DEBUG."""
     numeric = logging.getLevelName(level.upper())
     if not isinstance(numeric, int):

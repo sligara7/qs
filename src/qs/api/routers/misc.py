@@ -4,6 +4,7 @@ accepted support-level decision, always with a route so finch never sees a 404."
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -118,7 +119,7 @@ async def console_output_update(
 async def stream_console_output(services: Services = Depends(get_services)) -> Any:
     from fastapi.responses import StreamingResponse
 
-    async def generate():  # type: ignore[no-untyped-def]
+    async def generate() -> AsyncIterator[bytes]:
         async with services.broadcaster.subscribe(lambda e: e.kind == EventKind.CONSOLE_OUTPUT) as queue:
             while True:
                 event = await queue.get()

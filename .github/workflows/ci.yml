@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    name: lint + tests (no beamline)
+    name: lint + types + tests (no beamline)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -24,6 +24,10 @@ jobs:
         run: |
           uv run ruff check src tests tools/hextools-sim-profile
           uv run ruff format --check src tests tools/hextools-sim-profile
+      - name: Types
+        # src only: the shipped code is type-clean under strict mypy. tests are not yet —
+        # 181 missing annotations as of 2026-09-11 — and adding them is its own piece of work.
+        run: uv run mypy src
       - name: Install a browser for the smoke-page test
         run: uv run playwright install --with-deps chromium
       - name: Tests

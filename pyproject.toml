@@ -70,6 +70,14 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Body"]
 "tests/*" = ["E501"]  # long literal payloads in tests are clearer on one line
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
 ignore_missing_imports = true
+exclude = "tests/profiles/"  # IPython startup fixtures: magics, deliberately not valid Python
+
+# bluesky's RunEngine controls (request_pause, resume, abort, stop, halt) and bluesky.utils.is_plan
+# carry no annotations, so calling them is an "untyped call" qs cannot fix from here. These two
+# modules exist to wrap that library; everything else stays strict, including their own signatures.
+[[tool.mypy.overrides]]
+module = ["qs.engine.host", "qs.sources.namespace"]
+disallow_untyped_calls = false

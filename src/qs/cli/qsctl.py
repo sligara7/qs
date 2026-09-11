@@ -22,7 +22,7 @@ import json
 import os
 import sys
 import time
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -35,10 +35,10 @@ class QsClient:
         self._client = httpx.Client(base_url=url.rstrip("/") + "/api", headers=headers, timeout=timeout)
 
     def get(self, path: str, **params: Any) -> dict[str, Any]:
-        return self._client.get(path, params=params or None).json()
+        return cast("dict[str, Any]", self._client.get(path, params=params or None).json())
 
     def post(self, path: str, **body: Any) -> dict[str, Any]:
-        return self._client.post(path, json=body).json()
+        return cast("dict[str, Any]", self._client.post(path, json=body).json())
 
     def close(self) -> None:
         self._client.close()
@@ -130,7 +130,7 @@ def _queue(client: QsClient, args: argparse.Namespace) -> tuple[str, dict[str, A
         return "remove", client.post("/queue/item/remove", uid=args.uid)
     if sub == "move":
         pos = args.pos_dest
-        body: dict[str, Any] = {"uid": args.uid}
+        body = {"uid": args.uid}
         body["pos_dest"] = int(pos) if pos.lstrip("-").isdigit() else pos
         return "move", client.post("/queue/item/move", **body)
     if sub == "clear":

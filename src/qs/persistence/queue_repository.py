@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any, cast
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import CursorResult, delete, func, select, update
 
 from qs.persistence.database import Database, HistoryRow, QueueItemRow
 from qs.queue import HistoryEntry, ItemState, QueueItem
@@ -103,7 +104,7 @@ class SqlQueueRepository:
 
     def clear(self) -> int:
         with self._db.session() as s:
-            result = s.execute(delete(QueueItemRow))
+            result = cast("CursorResult[Any]", s.execute(delete(QueueItemRow)))
             return int(result.rowcount or 0)
 
     def pop_front(self) -> QueueItem | None:
@@ -162,5 +163,5 @@ class SqlQueueRepository:
 
     def clear_history(self) -> int:
         with self._db.session() as s:
-            result = s.execute(delete(HistoryRow))
+            result = cast("CursorResult[Any]", s.execute(delete(HistoryRow)))
             return int(result.rowcount or 0)

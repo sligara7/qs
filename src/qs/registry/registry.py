@@ -11,7 +11,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from qs.sources import LoadResult, PlanFactory
 
@@ -123,7 +123,7 @@ class Registry:
         resolved_kwargs = {k: self._substitute(v) for k, v in (kwargs or {}).items()}
 
         def factory() -> Generator[Any, Any, Any]:
-            return plan(*resolved_args, **resolved_kwargs)
+            return cast("Generator[Any, Any, Any]", plan(*resolved_args, **resolved_kwargs))
 
         return factory
 
