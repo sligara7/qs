@@ -172,6 +172,7 @@ def build_application(
         console=console,
         broadcaster=EventBroadcaster(events),
         devices=devices,
+        device_max_depth=config.startup.device_max_depth,
         config=config.to_dict(),
         shutdown_callback=shutdown_callback,
     )

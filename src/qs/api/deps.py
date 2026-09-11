@@ -34,6 +34,10 @@ class Services:
     console: ConsoleCapture
     broadcaster: EventBroadcaster
     devices: DeviceDefinitionService | None = None
+    # How deep the device tree is walked when describing devices (startup.device_max_depth).
+    # It decides whether a client can see the signals INSIDE a detector rather than only its
+    # first rung, which is what any device-configuration UI needs.
+    device_max_depth: int = 2
     config: dict[str, Any] = field(default_factory=dict)
     shutdown_callback: Any = None  # called by POST /api/manager/stop
 

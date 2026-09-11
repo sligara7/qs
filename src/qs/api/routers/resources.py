@@ -35,7 +35,7 @@ async def plans_existing(services: Services = Depends(get_services)) -> dict[str
 async def devices_allowed(services: Services = Depends(get_services)) -> dict[str, Any]:
     return ok(
         "",
-        devices_allowed=describe_devices(services.registry.devices()),
+        devices_allowed=describe_devices(services.registry.devices(), max_depth=services.device_max_depth),
         devices_allowed_uid=services.status.registry_uid,
     )
 
@@ -44,7 +44,7 @@ async def devices_allowed(services: Services = Depends(get_services)) -> dict[st
 async def devices_existing(services: Services = Depends(get_services)) -> dict[str, Any]:
     return ok(
         "",
-        devices_existing=describe_devices(services.registry.devices()),
+        devices_existing=describe_devices(services.registry.devices(), max_depth=services.device_max_depth),
         devices_existing_uid=services.status.registry_uid,
     )
 

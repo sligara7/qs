@@ -31,7 +31,7 @@ def _entry(services: Services, definition: DeviceDefinition) -> dict[str, Any]:
     entry = services.registry.devices().get(definition.name)
     d["instantiated"] = entry is not None and entry.origin == "definition"
     if d["instantiated"] and entry is not None:
-        d["device"] = describe_device(definition.name, entry.device)
+        d["device"] = describe_device(definition.name, entry.device, max_depth=services.device_max_depth)
     return d
 
 

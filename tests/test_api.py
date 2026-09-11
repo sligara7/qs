@@ -303,9 +303,11 @@ def test_info_websocket_streams_device_progress(client: TestClient) -> None:
             m = ws.receive_json()
             if "device_progress" in m["msg"]:
                 progress.append(m["msg"]["device_progress"])
-                if m["msg"]["device_progress"].get("completed") and any(
-                    not p.get("completed") for p in progress
-                ):
+                # Stop only when BOTH have been seen: a status reporting itself done, and the
+                # completed message that closes the wait. They arrive in that order and the
+                # assertions below want both, so breaking on either one alone loses the other.
+                saw_done = any(e.get("done") for p in progress for e in p.get("statuses", {}).values())
+                if saw_done and any(p.get("completed") for p in progress):
                     break
         updates = [p for p in progress if not p.get("completed")]
         assert updates, progress
@@ -518,3 +520,59 @@ def test_an_idle_engine_is_never_stalled() -> None:
     progress = reporter._progress_and_stall()  # noqa: SLF001
     assert progress["plan_stalled"] is False
     assert progress["seconds_since_progress"] is None
+
+
+# ---- the configured device tree depth is honoured ---------------------------------------
+
+
+def test_device_max_depth_from_config_reaches_the_device_listing(tmp_path: Path) -> None:
+    """A configured depth must change what a client sees, or the setting is a lie.
+
+    It decides whether a client can see the signals INSIDE a detector or only its first rung,
+    which is the first thing any device-configuration UI needs. Until 2026-09-11 the value was
+    declared in config, named in cap:qserver-env, and read by nothing.
+    """
+    from ophyd import Component as Cpt
+    from ophyd import Device, Signal
+
+    from qs.api.describe import describe_devices
+    from qs.registry import DeviceEntry
+
+    class Inner(Device):
+        leaf = Cpt(Signal, value=0)
+
+    class Middle(Device):
+        inner = Cpt(Inner, "")
+
+    class Outer(Device):
+        middle = Cpt(Middle, "")
+
+    devices = {"det": DeviceEntry("det", Outer(name="det"), "profile")}
+
+    # max_depth counts RUNGS OF COMPONENTS below the device, measured 2026-09-11 rather than
+    # assumed: 0 publishes none, 1 publishes the children, 2 the grandchildren, and so on.
+    assert "components" not in describe_devices(devices, max_depth=0)["det"]
+
+    one = describe_devices(devices, max_depth=1)["det"]
+    assert set(one["components"]) == {"middle"}
+    assert "components" not in one["components"]["middle"], "depth 1 is one rung"
+
+    three = describe_devices(devices, max_depth=3)["det"]
+    assert "leaf" in three["components"]["middle"]["components"]["inner"]["components"], (
+        "a raised depth must actually reach further into the tree"
+    )
+
+
+def test_the_running_service_passes_its_configured_depth_through(tmp_path: Path) -> None:
+    """The value has to survive the trip from config to the route, not just exist in both."""
+    from qs.runtime import build_application, load_config
+
+    config = load_config(
+        env={"QS_STARTUP_DIR": str(PROFILE), "QS_DATABASE_URL": f"sqlite:///{tmp_path}/q.db"}
+    )
+    config.startup.device_max_depth = 5
+    app = build_application(config)
+    try:
+        assert app.services.device_max_depth == 5
+    finally:
+        app.close()
