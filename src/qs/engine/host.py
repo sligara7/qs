@@ -289,6 +289,46 @@ class EngineHost:
             out.append({"uid": uid, "is_open": True, "scan_id": scan_id})
         return out
 
+    def collected_events(self) -> dict[str, Any]:
+        """How many events each open run has collected, per stream — polled, never subscribed.
+
+        This is the plan-level progress signal (``dec:open-where-can-plan-progress-come-from``).
+        bluesky's run bundlers hold a live per-stream seq_num counter; reading it costs nothing
+        and, crucially, puts no callback in the document path. A RunEngine subscriber would run
+        on the engine thread inside every document, which is what ``cap:engine-isolation``
+        exists to prevent — and ``dec:no-service-document-consumers`` stands untouched, because
+        counting is not consuming: nothing here is written, forwarded or redirected.
+
+        OFF BY ONE, MEASURED NOT ASSUMED: the counter holds the NEXT seq_num, so after three
+        events it reads 4. Collected is therefore ``counter - 1``, verified against a real
+        RunEngine on 2026-09-11 and pinned by a test.
+
+        LIVE ONLY: bundlers are discarded when a run closes, so this answers for runs that are
+        open right now and reports nothing about a finished one. A completed item's totals
+        would have to come from somewhere else, and nothing asks for them yet.
+        """
+        engine = self._engine
+        if engine is None:
+            return {"runs": [], "total": 0}
+        runs: list[dict[str, Any]] = []
+        for bundler in getattr(engine, "_run_bundlers", {}).values():  # noqa: SLF001
+            counters = getattr(bundler, "_sequence_counters", None) or {}  # noqa: SLF001
+            streams = {
+                str(name): int(nxt) - 1
+                for name, nxt in counters.items()
+                if isinstance(nxt, int) and int(nxt) >= 1
+            }
+            md = getattr(bundler, "_md", None) or getattr(bundler, "md", None) or {}  # noqa: SLF001
+            runs.append(
+                {
+                    "uid": getattr(bundler, "_run_start_uid", None),  # noqa: SLF001
+                    "scan_id": md.get("scan_id") if isinstance(md, dict) else None,
+                    "streams": streams,
+                    "total": sum(streams.values()),
+                }
+            )
+        return {"runs": runs, "total": sum(r["total"] for r in runs)}
+
     def subscribers(self) -> dict[str, list[str]]:
         """Names of the callbacks subscribed to the engine, per document type (read-only).
 

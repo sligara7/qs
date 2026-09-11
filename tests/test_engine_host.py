@@ -235,8 +235,17 @@ def test_device_progress_streams_and_profile_hook_is_chained(
         "time_remaining",
         "done",
     }
-    assert all(required <= set(p) for p in updates)
-    assert any(p["done"] for p in updates), "the final update for a status must say done"
+    # Since 2026-09-11 each update carries a keyed map of EVERY status in flight, not one
+    # merged payload (dec:open-progress-as-a-map-of-concurrent-statuses).
+    assert all("statuses" in p for p in updates)
+    entries = [entry for p in updates for entry in p["statuses"].values()]
+    assert entries, "expected at least one status inside the map"
+    assert all(required <= set(entry) for entry in entries)
+    assert all(name == entry["name"] for p in updates for name, entry in p["statuses"].items()), (
+        "the map key must be the device name the entry reports"
+    )
+    assert any(entry["done"] for entry in entries), "the final update for a status must say done"
+    assert all(p["statuses"] == {} for p in completed), "the completed message closes the picture"
     # The profile's own waiting hook kept receiving calls (both with statuses and with None).
     assert True in ns["hook_calls"] and False in ns["hook_calls"]
 
@@ -304,3 +313,47 @@ def test_engine_metadata_returns_what_the_profile_set(loaded: tuple[EngineHost, 
 def test_engine_metadata_is_empty_before_a_profile_is_loaded(host: EngineHost) -> None:
     assert host.engine_metadata() == {}
     assert host.open_runs() == []
+
+
+# ---- plan-level progress, polled from the engine ---------------------------------------
+
+
+def test_collected_events_counts_what_each_open_run_has_taken(
+    loaded: tuple[EngineHost, Registry],
+) -> None:
+    """req:plan-progress-is-visible-while-it-runs, polled rather than subscribed.
+
+    The count is read from bluesky's run bundlers while the run is open. Nothing subscribes to
+    the document stream, so dec:no-service-document-consumers stands and no callback of ours
+    runs inside a plan.
+    """
+    host, registry = loaded
+    seen: list[int] = []
+
+    def observe(_name: str, doc: dict) -> None:
+        if _name == "event":
+            seen.append(host.collected_events()["total"])
+
+    token = host.engine.subscribe(observe)
+    try:
+        outcome = host.run_plan(
+            registry.resolve("count", [["det"]], {"num": 3}), item_uid="item-counted"
+        ).result(timeout=30)
+    finally:
+        host.engine.unsubscribe(token)
+    assert outcome.succeeded
+
+    # The counter holds the NEXT seq_num, so collected is counter - 1. Measured against a real
+    # RunEngine on 2026-09-11: after the first event it reads 2. If bluesky ever changes that,
+    # this is the test that says so rather than a progress display quietly lying by one.
+    assert seen == [1, 2, 3], f"expected one more collected event each time, got {seen}"
+
+
+def test_collected_events_is_empty_between_runs(loaded: tuple[EngineHost, Registry]) -> None:
+    """Bundlers are discarded when a run closes, so this signal is live-only and says so."""
+    host, _ = loaded
+    assert host.collected_events() == {"runs": [], "total": 0}
+
+
+def test_collected_events_answers_before_a_profile_is_loaded(host: EngineHost) -> None:
+    assert host.collected_events() == {"runs": [], "total": 0}

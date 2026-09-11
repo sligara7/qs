@@ -105,6 +105,25 @@ class ProgressWatcher:
                 except Exception:  # noqa: BLE001
                     logger.debug("Status %r rejected a completion callback", status, exc_info=True)
 
+    def _snapshot(self) -> dict[str, dict[str, Any]]:
+        """Every status currently being watched, keyed by device name.
+
+        Called under ``self._lock``. A flyscan has a motor, a detector and a PandA in flight at
+        once, and a single merged figure cannot say which is which — so every event carries the
+        whole picture rather than one participant (``dec:open-progress-as-a-map-of-concurrent-statuses``).
+        Statuses already finished stay in the map with ``done: true`` until the wait ends, so a
+        client that missed a message still sees what happened.
+
+        Keyed by name, so two statuses reporting the same device name collapse into one entry.
+        ophyd device names are unique in a profile and an unnamed status gets its own
+        ``status_N``, so this has no known way to bite; it is recorded because it is the one
+        thing the shape gives up relative to keying by identity.
+        """
+        return {
+            str(payload.get("name") or "unknown"): {field: payload.get(field) for field in _FIELDS}
+            for payload in self._last_payload.values()
+        }
+
     def _make_completion(self, status: Any, label: int) -> Callable[..., None]:
         key = id(status)
 
@@ -119,7 +138,8 @@ class ProgressWatcher:
                 last.setdefault(field, None)
             with self._lock:
                 self._last_payload[key] = last
-            self._events.emit(EventKind.DEVICE_PROGRESS, **last)
+                statuses = self._snapshot()
+            self._events.emit(EventKind.DEVICE_PROGRESS, statuses=statuses, completed=False)
 
         return on_done
 
@@ -167,9 +187,12 @@ class ProgressWatcher:
                 if not done and last is not None and (now - last) < self._min_update_period:
                     return
                 self._last_sent[key] = now
-            self._events.emit(EventKind.DEVICE_PROGRESS, **{f: merged.get(f) for f in _FIELDS})
+                statuses = self._snapshot()
+            # Throttled per status, but every message carries all of them: a client that has
+            # been quiet for a second is never left assembling the picture from fragments.
+            self._events.emit(EventKind.DEVICE_PROGRESS, statuses=statuses, completed=False)
 
         return callback
 
     def _send_completed(self) -> None:
-        self._events.emit(EventKind.DEVICE_PROGRESS, completed=True)
+        self._events.emit(EventKind.DEVICE_PROGRESS, statuses={}, completed=True)

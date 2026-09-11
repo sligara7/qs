@@ -308,9 +308,14 @@ def test_info_websocket_streams_device_progress(client: TestClient) -> None:
                 ):
                     break
         updates = [p for p in progress if not p.get("completed")]
-        assert updates and any(p.get("done") for p in updates), progress
+        assert updates, progress
+        entries = [entry for p in updates for entry in p["statuses"].values()]
+        assert entries and any(e.get("done") for e in entries), progress
         assert {"name", "current", "target", "fraction", "time_elapsed", "time_remaining", "done"} <= set(
-            updates[0]
+            entries[0]
+        )
+        assert "motor" in {name for p in updates for name in p["statuses"]}, (
+            "the map is keyed by device name, which is the point of carrying it"
         )
         assert any(p.get("completed") for p in progress)
     wait_for(lambda: status(client)["items_in_history"] == 1)

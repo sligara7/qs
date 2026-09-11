@@ -99,7 +99,11 @@ async function connect() {
     $('conn').textContent = 'connected';
   } catch (e) { $('conn').textContent = 'error: ' + e; return; }
   ws('/api/status/ws', s => { $('status').textContent = JSON.stringify({manager_state: s.manager_state, re_state: s.re_state, items_in_queue: s.items_in_queue, running_item_uid: s.running_item_uid, queue_stop_pending: s.queue_stop_pending, autostart: s.queue_autostart_enabled, last_error: s.qs && s.qs.last_error}, null, 1); refresh(); });
-  ws('/api/info/ws', m => { if (m.msg.device_progress) { const d = m.msg.device_progress; $('progress').textContent = d.completed ? 'completed' : `${d.name}: ${d.current} → ${d.target} (${Math.round((d.fraction||0)*100)}%)`; } });
+  ws('/api/info/ws', m => { if (m.msg.device_progress) { const d = m.msg.device_progress;
+    // Since 2026-09-11 a progress message carries every status in flight, keyed by device.
+    $('progress').textContent = d.completed ? 'completed' : Object.entries(d.statuses || {})
+      .map(([name, s]) => `${name}: ${s.current} → ${s.target} (${Math.round((s.fraction||0)*100)}%)${s.done ? ' ✓' : ''}`)
+      .join('   |   ') || 'waiting'; } });
   ws('/api/console_output/ws', m => { const el = $('console'); el.textContent = (el.textContent + m.msg).split('\n').slice(-30).join('\n'); });
   refresh();
 }
