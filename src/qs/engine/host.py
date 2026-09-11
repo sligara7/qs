@@ -29,7 +29,7 @@ from typing import Any
 from bluesky.run_engine import RunEngine, RunEngineInterrupted
 
 from qs.diagnostics import summarize
-from qs.engine.events import EventBus
+from qs.engine.events import EventBus, EventKind
 from qs.engine.progress import ProgressWatcher
 from qs.sources.protocol import LoadResult, ProfileSource
 
@@ -350,7 +350,7 @@ class EngineHost:
         self._install_engine(engine, adopted)
         self._load_result = result
         self._events.emit(
-            "source_loaded",
+            EventKind.SOURCE_LOADED,
             description=result.source_description or source.description,
             n_devices=len(result.devices),
             n_plans=len(result.plans),
@@ -378,7 +378,7 @@ class EngineHost:
                 except Exception:  # noqa: BLE001
                     logger.exception("Profile state_hook raised; continuing")
             logger.info("[engine] %s -> %s", old_state, new_state)
-            self._events.emit("re_state", state=str(new_state), previous=str(old_state))
+            self._events.emit(EventKind.RE_STATE, state=str(new_state), previous=str(old_state))
 
         engine.state_hook = state_hook
         if self._progress_enabled:
@@ -402,7 +402,7 @@ class EngineHost:
         self._last_error = None
         self._abort_reason = ""
         self._set_state(EngineState.RUNNING)
-        self._events.emit("plan_started", item_uid=item_uid)
+        self._events.emit(EventKind.PLAN_STARTED, item_uid=item_uid)
         outcome: PlanOutcome
         try:
             plan = plan_factory()
@@ -427,7 +427,7 @@ class EngineHost:
         if not outcome.succeeded:
             self._last_error = outcome.exception or outcome.reason or outcome.exit_status
         self._set_state(EngineState.IDLE)
-        self._events.emit("plan_finished", item_uid=item_uid, outcome=outcome)
+        self._events.emit(EventKind.PLAN_FINISHED, item_uid=item_uid, outcome=outcome)
         return outcome
 
     def _handle_pause(self, item_uid: str) -> PlanOutcome:
@@ -522,4 +522,4 @@ class EngineHost:
         with self._state_lock:
             previous, self._state = self._state, state
         if previous is not state:
-            self._events.emit("state", state=state.value, previous=previous.value)
+            self._events.emit(EventKind.STATE, state=state.value, previous=previous.value)

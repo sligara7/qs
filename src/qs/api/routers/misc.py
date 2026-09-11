@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Request
 from qs.api.deps import Services, get_services, require_scope
 from qs.api.payload import read_payload
 from qs.api.responses import fail, ok, unsupported
+from qs.engine import EventKind
 from qs.errors import ErrorCode
 
 router = APIRouter(tags=["misc"])
@@ -118,7 +119,7 @@ async def stream_console_output(services: Services = Depends(get_services)) -> A
     from fastapi.responses import StreamingResponse
 
     async def generate():  # type: ignore[no-untyped-def]
-        async with services.broadcaster.subscribe(lambda e: e.kind == "console_output") as queue:
+        async with services.broadcaster.subscribe(lambda e: e.kind == EventKind.CONSOLE_OUTPUT) as queue:
             while True:
                 event = await queue.get()
                 yield (event.payload.get("msg") or "").encode()

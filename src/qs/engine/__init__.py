@@ -6,7 +6,16 @@ or created). Everything else in the service talks to it through
 (the event side). This package imports neither FastAPI nor SQLAlchemy, by design.
 """
 
-from qs.engine.events import EngineEvent, EventBus
-from qs.engine.host import EngineHost, EngineState, PlanOutcome
+from qs.engine.events import STATUS_CHANGE_KINDS, EngineEvent, EventBus, EventKind
+from qs.engine.host import EngineHost, EngineHostError, EngineState, PlanOutcome
 
-__all__ = ["EngineEvent", "EngineHost", "EngineState", "EventBus", "PlanOutcome"]
+__all__ = [
+    "STATUS_CHANGE_KINDS",
+    "EngineEvent",
+    "EngineHost",
+    "EngineHostError",
+    "EngineState",
+    "EventBus",
+    "EventKind",
+    "PlanOutcome",
+]

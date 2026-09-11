@@ -19,34 +19,37 @@ class Base(DeclarativeBase):
     pass
 
 
-class QueueItemRow(Base):
+class PlanItemColumns:
+    """The columns that describe a plan item, shared by the live queue and the history.
+
+    A history row IS a queue item plus how it ended, so these eight columns must stay
+    identical in both tables. They were written out twice until 2026-09-11; a mixin is what
+    stops the two definitions drifting apart. Each table declares its own identity columns
+    (``item_uid`` / ``position`` / ``id``) because those genuinely differ.
+    """
+
+    item_type: Mapped[str] = mapped_column(String(32), nullable=False, default="plan")
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    args: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    kwargs: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    meta: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    user: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    user_group: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    created_at: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class QueueItemRow(PlanItemColumns, Base):
     __tablename__ = "queue_items"
 
     item_uid: Mapped[str] = mapped_column(String(64), primary_key=True)
     position: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
-    item_type: Mapped[str] = mapped_column(String(32), nullable=False, default="plan")
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    args: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
-    kwargs: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
-    meta: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
-    user: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    user_group: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    created_at: Mapped[float] = mapped_column(Float, nullable=False)
 
 
-class HistoryRow(Base):
+class HistoryRow(PlanItemColumns, Base):
     __tablename__ = "queue_history"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     item_uid: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
-    item_type: Mapped[str] = mapped_column(String(32), nullable=False, default="plan")
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    args: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
-    kwargs: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
-    meta: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
-    user: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    user_group: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    created_at: Mapped[float] = mapped_column(Float, nullable=False)
     state: Mapped[str] = mapped_column(String(32), nullable=False)
     exit_status: Mapped[str] = mapped_column(String(32), nullable=False)
     run_uids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)

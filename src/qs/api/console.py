@@ -18,7 +18,7 @@ import uuid
 from collections import deque
 from typing import Any, TextIO
 
-from qs.engine.events import EventBus
+from qs.engine import EventBus, EventKind
 
 
 class _Tee(io.TextIOBase):
@@ -90,7 +90,7 @@ class ConsoleCapture:
         with self._lock:
             self._messages.append(message)
             self._uid = str(uuid.uuid4())
-        self._events.emit("console_output", **message)
+        self._events.emit(EventKind.CONSOLE_OUTPUT, **message)
 
     # ---- read ----
 

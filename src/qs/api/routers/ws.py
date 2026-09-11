@@ -21,6 +21,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from qs.api.auth import AuthenticationError, Credential
 from qs.api.deps import Services
 from qs.api.streams import json_safe
+from qs.engine import STATUS_CHANGE_KINDS, EventKind
 
 router = APIRouter(tags=["websockets"])
 
@@ -66,20 +67,7 @@ async def status_ws(ws: WebSocket) -> None:
         return
     drain = asyncio.create_task(_drain(ws))
     try:
-        async with services.broadcaster.subscribe(
-            lambda e: (
-                e.kind
-                in {
-                    "state",
-                    "queue_state",
-                    "item_started",
-                    "item_finished",
-                    "plan_started",
-                    "plan_finished",
-                    "re_state",
-                }
-            )
-        ) as queue:
+        async with services.broadcaster.subscribe(lambda e: e.kind in STATUS_CHANGE_KINDS) as queue:
             last_sent = 0.0
             while not drain.done():
                 snapshot = services.status.snapshot()
@@ -104,16 +92,7 @@ async def info_ws(ws: WebSocket) -> None:
     if not await _authenticate(ws, services):
         return
     drain = asyncio.create_task(_drain(ws))
-    interesting = {
-        "state",
-        "queue_state",
-        "item_started",
-        "item_finished",
-        "plan_started",
-        "plan_finished",
-        "re_state",
-        "device_progress",
-    }
+    interesting = STATUS_CHANGE_KINDS | {EventKind.DEVICE_PROGRESS}
     try:
         async with services.broadcaster.subscribe(lambda e: e.kind in interesting) as queue:
             last_status = 0.0
@@ -130,7 +109,7 @@ async def info_ws(ws: WebSocket) -> None:
                     )
                 except TimeoutError:
                     continue
-                if event.kind == "device_progress":
+                if event.kind == EventKind.DEVICE_PROGRESS:
                     await ws.send_text(
                         json.dumps(
                             {"time": event.time, "msg": {"device_progress": json_safe(dict(event.payload))}}
@@ -157,7 +136,7 @@ async def console_ws(ws: WebSocket) -> None:
         return
     drain = asyncio.create_task(_drain(ws))
     try:
-        async with services.broadcaster.subscribe(lambda e: e.kind == "console_output") as queue:
+        async with services.broadcaster.subscribe(lambda e: e.kind == EventKind.CONSOLE_OUTPUT) as queue:
             while not drain.done():
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=1.0)

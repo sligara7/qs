@@ -17,7 +17,7 @@ import time
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from qs.engine.events import EventBus
+from qs.engine.events import EventBus, EventKind
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ class ProgressWatcher:
                 last.setdefault(field, None)
             with self._lock:
                 self._last_payload[key] = last
-            self._events.emit("device_progress", **last)
+            self._events.emit(EventKind.DEVICE_PROGRESS, **last)
 
         return on_done
 
@@ -167,9 +167,9 @@ class ProgressWatcher:
                 if not done and last is not None and (now - last) < self._min_update_period:
                     return
                 self._last_sent[key] = now
-            self._events.emit("device_progress", **{f: merged.get(f) for f in _FIELDS})
+            self._events.emit(EventKind.DEVICE_PROGRESS, **{f: merged.get(f) for f in _FIELDS})
 
         return callback
 
     def _send_completed(self) -> None:
-        self._events.emit("device_progress", completed=True)
+        self._events.emit(EventKind.DEVICE_PROGRESS, completed=True)

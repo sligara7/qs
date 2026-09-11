@@ -18,8 +18,7 @@ import time
 import traceback
 from typing import Any
 
-from qs.engine.events import EventBus
-from qs.engine.host import EngineHost, EngineHostError, EngineState, PlanOutcome
+from qs.engine import EngineHost, EngineHostError, EngineState, EventBus, EventKind, PlanOutcome
 from qs.errors import ErrorCode
 from qs.queue.models import HistoryEntry, ItemState, QueueItem
 from qs.queue.service import QueueError, QueueService
@@ -173,7 +172,7 @@ class Sequencer:
             self._stop_pending = False
             n_items = len(self._queue)
         logger.info("[queue] started: %d item(s) to run", n_items)
-        self._events.emit("queue_state", running=True, stop_pending=False, autostart=self._autostart)
+        self._events.emit(EventKind.QUEUE_STATE, running=True, stop_pending=False, autostart=self._autostart)
         self._wakeup.set()
 
     def queue_stop(self) -> None:
@@ -183,13 +182,15 @@ class Sequencer:
                 raise SequencerError("The queue is not running")
             self._stop_pending = True
         logger.info("[queue] stop requested: the current item finishes, then the queue stops")
-        self._events.emit("queue_state", running=True, stop_pending=True, autostart=self._autostart)
+        self._events.emit(EventKind.QUEUE_STATE, running=True, stop_pending=True, autostart=self._autostart)
 
     def queue_stop_cancel(self) -> None:
         with self._lock:
             self._stop_pending = False
         logger.info("[queue] stop request withdrawn")
-        self._events.emit("queue_state", running=self._running, stop_pending=False, autostart=self._autostart)
+        self._events.emit(
+            EventKind.QUEUE_STATE, running=self._running, stop_pending=False, autostart=self._autostart
+        )
 
     def set_autostart(self, enable: bool) -> None:
         if enable:
@@ -198,7 +199,7 @@ class Sequencer:
             self._autostart = bool(enable)
         logger.info("[queue] autostart %s", "on" if enable else "off")
         self._events.emit(
-            "queue_state", running=self._running, stop_pending=self._stop_pending, autostart=enable
+            EventKind.QUEUE_STATE, running=self._running, stop_pending=self._stop_pending, autostart=enable
         )
         self._wakeup.set()
 
@@ -230,7 +231,7 @@ class Sequencer:
                     "[queue] empty, idle%s", "; autostart will run the next item" if self._autostart else ""
                 )
                 self._events.emit(
-                    "queue_state",
+                    EventKind.QUEUE_STATE,
                     running=False,
                     stop_pending=False,
                     autostart=self._autostart,
@@ -247,18 +248,20 @@ class Sequencer:
                 self._running = False
                 self._stop_pending = False
                 logger.info("[queue] stopped as requested")
-                self._events.emit("queue_state", running=False, stop_pending=False, autostart=self._autostart)
+                self._events.emit(
+                    EventKind.QUEUE_STATE, running=False, stop_pending=False, autostart=self._autostart
+                )
                 return False
             if self._autostart and not self._running and len(self._queue) > 0:
                 self._running = True
                 logger.info("[queue] autostart: %d item(s) arrived, running", len(self._queue))
-                self._events.emit("queue_state", running=True, stop_pending=False, autostart=True)
+                self._events.emit(EventKind.QUEUE_STATE, running=True, stop_pending=False, autostart=True)
             return self._running and self._host.state is EngineState.IDLE
 
     def _run_one(self, item: QueueItem) -> None:
         self._running_item = item
         time_start = time.time()
-        self._events.emit("item_started", item_uid=item.item_uid, name=item.name)
+        self._events.emit(EventKind.ITEM_STARTED, item_uid=item.item_uid, name=item.name)
         try:
             factory = self._registry.resolve(item.name, item.args, item.kwargs)
             md = dict(item.meta) if item.meta else {}
@@ -298,7 +301,7 @@ class Sequencer:
                 self._stop_pending = False
             self._last_error = headline
             self._events.emit(
-                "queue_state",
+                EventKind.QUEUE_STATE,
                 running=False,
                 stop_pending=False,
                 autostart=self._autostart,
@@ -357,7 +360,7 @@ class Sequencer:
             with self._lock:
                 self._running = False
         self._events.emit(
-            "item_finished", item_uid=item.item_uid, name=item.name, exit_status=outcome.exit_status
+            EventKind.ITEM_FINISHED, item_uid=item.item_uid, name=item.name, exit_status=outcome.exit_status
         )
 
     def _safe(self, fn: Any) -> None:
